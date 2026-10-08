@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.WorkTime" parent="android:Theme.DeviceDefault.NoActionBar">
+        <!-- 与浅色一致：关掉系统 starting window，见 values/themes.xml -->
+        <item name="android:windowDisablePreview">true</item>
+        <item name="android:windowBackground">@color/app_background</item>
+        <item name="android:windowSplashScreenBackground">@color/app_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_art</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/splash_icon_background</item>
+    </style>
+</resources>

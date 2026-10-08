@@ -1,0 +1,61 @@
+# =========================================================
+#  工作记录 (WorkTime) —— Git 忽略规则
+# =========================================================
+
+# ---- Gradle / 构建产物 ----
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+captures/
+.kotlin/
+
+# ---- 本地配置（含 Android SDK 路径，切勿提交）----
+local.properties
+
+# ---- 签名与密钥（切勿提交）----
+*.jks
+*.keystore
+keystore.properties
+release/
+
+# ---- 编译产物 ----
+*.apk
+*.aab
+*.aar
+*.ap_
+*.dex
+*.class
+*.hprof
+*.log
+output.json
+lint-results*.html
+lint-results*.xml
+
+# ---- 原生构建 ----
+.externalNativeBuild/
+.cxx/
+
+# ---- Android Studio / IntelliJ ----
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# ---- 操作系统 ----
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# ---- 编辑器 / 工具 ----
+.vscode/
+*.swp
+*.swo
+*~
+
+# ---- 本地设计素材（未参与打包，非项目源码）----
+images/
+icons/
