@@ -12,7 +12,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -32,10 +31,16 @@ private val SplashArts = intArrayOf(
 private const val ShowMillis = 700L
 private const val FadeOutMillis = 260L
 
+/** 一个进程里最多展示一次：否则在设置里把开关打开时，开屏图会当场又弹一遍。 */
+private var shownThisProcess = false
+
 @Composable
-fun LaunchArt() {
-    val art = rememberSaveable { SplashArts.random() }
-    var active by rememberSaveable { mutableStateOf(true) }
+fun LaunchArt(enabled: Boolean) {
+    if (!enabled || shownThisProcess) return
+    shownThisProcess = true
+
+    val art = remember { SplashArts.random() }
+    var active by remember { mutableStateOf(true) }
     if (!active) return
 
     var fading by remember { mutableStateOf(false) }

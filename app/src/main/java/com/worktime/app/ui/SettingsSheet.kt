@@ -16,6 +16,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -33,8 +34,10 @@ import com.worktime.app.ui.theme.themeLabel
 @Composable
 fun SettingsSheet(
     themeMode: ThemeMode,
+    launchArtEnabled: Boolean,
     busy: Boolean,
     onTheme: (ThemeMode) -> Unit,
+    onLaunchArt: (Boolean) -> Unit,
     onExport: () -> Unit,
     onImport: () -> Unit,
     onClear: () -> Unit,
@@ -59,6 +62,15 @@ fun SettingsSheet(
                 labelOf = ::themeLabel,
                 onSelect = onTheme,
             )
+            Spacer(Modifier.height(12.dp))
+            SoftCard(contentPadding = 6.dp) {
+                SwitchRow(
+                    title = "随机开屏图片",
+                    description = "打开应用时随机显示一张全屏图片，短暂停留后淡出；关闭后直接进入主界面",
+                    checked = launchArtEnabled,
+                    onCheckedChange = onLaunchArt,
+                )
+            }
 
             Spacer(Modifier.height(22.dp))
             SectionLabel("数据")
@@ -130,6 +142,33 @@ fun SettingsSheet(
                 TextButton(onClick = { askClear = false }) { Text("取消") }
             },
         )
+    }
+}
+
+@Composable
+private fun SwitchRow(
+    title: String,
+    description: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 

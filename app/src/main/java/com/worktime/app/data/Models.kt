@@ -22,6 +22,7 @@ enum class ThemeMode { system, light, dark }
 @Serializable
 data class Settings(
     val theme: ThemeMode = ThemeMode.system,
+    val launchArt: Boolean = true,
 )
 
 @Serializable

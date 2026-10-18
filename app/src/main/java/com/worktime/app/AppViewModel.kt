@@ -63,6 +63,10 @@ class AppViewModel(
         repository.update { it.copy(settings = it.settings.copy(theme = mode)) }
     }
 
+    fun setLaunchArt(enabled: Boolean) {
+        repository.update { it.copy(settings = it.settings.copy(launchArt = enabled)) }
+    }
+
     fun exportTo(uri: Uri) {
         scope.launch {
             _busy.value = true

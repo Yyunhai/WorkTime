@@ -49,6 +49,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun AppRoot(vm: AppViewModel) {
     val store by vm.store.collectAsState()
+    val loaded by vm.loaded.collectAsState()
     val pendingImport by vm.pendingImport.collectAsState()
     val busy by vm.busy.collectAsState()
 
@@ -143,8 +144,10 @@ fun AppRoot(vm: AppViewModel) {
             if (showSettings) {
                 SettingsSheet(
                     themeMode = store.settings.theme,
+                    launchArtEnabled = store.settings.launchArt,
                     busy = busy,
                     onTheme = vm::setTheme,
+                    onLaunchArt = vm::setLaunchArt,
                     onExport = { exportLauncher.launch(suggestedFileName(today)) },
                     onImport = { importLauncher.launch(arrayOf("application/json", "*/*")) },
                     onClear = { vm.clearAll() },
@@ -172,7 +175,7 @@ fun AppRoot(vm: AppViewModel) {
                 )
             }
 
-            LaunchArt()
+            LaunchArt(enabled = loaded && store.settings.launchArt)
         }
     }
 }
