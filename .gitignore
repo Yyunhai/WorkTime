@@ -62,3 +62,8 @@ icons/
 
 # ---- 文档 ----
 RELEASE.md
+
+# ---- ----
+*.jks
+*.keystore
+keystore.base64.txt
