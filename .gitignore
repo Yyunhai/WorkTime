@@ -59,3 +59,6 @@ desktop.ini
 # ---- 本地设计素材（未参与打包，非项目源码）----
 images/
 icons/
+
+# ---- 文档 ----
+RELEASE.md
