@@ -44,8 +44,13 @@ android {
         applicationId = "com.worktime.app"
         minSdk = 31
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        //versionCode = 1
+        //versionName = "1.0"
+        val tagName = System.getenv("TAG_NAME") ?: "v1.0"
+        val cleanVersion = tagName.removePrefix("v")
+
+        versionName = cleanVersion
+        versionCode = cleanVersion.replace(".", "").toIntOrNull() ?: 1
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
