@@ -31,13 +31,17 @@ private val SplashArts = intArrayOf(
 private const val ShowMillis = 700L
 private const val FadeOutMillis = 260L
 
-/** 一个进程里最多展示一次：否则在设置里把开关打开时，开屏图会当场又弹一遍。 */
-private var shownThisProcess = false
+/**
+ * 加载完成后决定一次是否展示：这样启动时关着开关、进设置再打开，也不会当场又弹一遍。
+ * （原先在 enabled == false 时提前 return，shownThisProcess 没置位，正好漏掉这种情况。）
+ */
+private var decidedThisProcess = false
 
 @Composable
-fun LaunchArt(enabled: Boolean) {
-    if (!enabled || shownThisProcess) return
-    shownThisProcess = true
+fun LaunchArt(loaded: Boolean, enabled: Boolean) {
+    if (!loaded || decidedThisProcess) return
+    decidedThisProcess = true
+    if (!enabled) return
 
     val art = remember { SplashArts.random() }
     var active by remember { mutableStateOf(true) }

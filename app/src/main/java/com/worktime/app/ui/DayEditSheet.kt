@@ -20,12 +20,15 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -42,10 +45,15 @@ import androidx.compose.ui.unit.dp
 import com.worktime.app.R
 import com.worktime.app.data.DayRecord
 import com.worktime.app.data.DayStatus
+import com.worktime.app.data.Expense
+import com.worktime.app.data.ExpenseCategory
 import com.worktime.app.data.Segment
+import com.worktime.app.domain.ExpenseMath
 import com.worktime.app.domain.WorkMath
 import com.worktime.app.ui.theme.LocalDayInk
+import com.worktime.app.ui.theme.LocalExpenseInk
 import com.worktime.app.ui.theme.NumberFont
+import com.worktime.app.ui.theme.expenseCategoryLabel
 import com.worktime.app.ui.theme.statusLabel
 import java.time.LocalDate
 
@@ -54,6 +62,10 @@ import java.time.LocalDate
 fun DayEditSheet(
     date: LocalDate,
     record: DayRecord?,
+    expenses: List<Expense>,
+    onAddExpense: (amountCents: Long, category: ExpenseCategory, note: String) -> Unit,
+    onUpdateExpense: (Expense) -> Unit,
+    onDeleteExpense: (Expense) -> Unit,
     onSave: (DayRecord) -> Unit,
     onDelete: () -> Unit,
     onDismiss: () -> Unit,
@@ -66,6 +78,8 @@ fun DayEditSheet(
     }
     var breakText by remember(date) { mutableStateOf((record?.breakMinutes ?: 0).toString()) }
     var note by remember(date) { mutableStateOf(record?.note ?: "") }
+    var addingExpense by remember { mutableStateOf(false) }
+    var editingExpense by remember { mutableStateOf<Expense?>(null) }
 
     val breakMinutes = breakText.toIntOrNull()?.coerceIn(0, 720) ?: 0
     val draft = DayRecord(
@@ -74,10 +88,13 @@ fun DayEditSheet(
         breakMinutes = breakMinutes,
         note = note.trim(),
     )
-    val problem = validationProblem(draft)
+    val problem = WorkMath.validationProblem(draft)
     val ink = LocalDayInk.current
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    // 直接展开到完整高度：默认的半展开会让表单只露一半，还要手动往上拉。
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -184,6 +201,39 @@ fun DayEditSheet(
 
             Spacer(Modifier.height(22.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
+                SectionLabel("支出", modifier = Modifier.weight(1f))
+                TextButton(onClick = { addingExpense = true }) { Text("＋ 记一笔") }
+            }
+            if (expenses.isEmpty()) {
+                Text(
+                    text = "这一天还没有支出。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
+            } else {
+                SoftCard(contentPadding = 4.dp) {
+                    expenses.forEachIndexed { index, expense ->
+                        if (index > 0) {
+                            HorizontalDivider(
+                                color = MaterialTheme.colorScheme.outlineVariant,
+                                modifier = Modifier.padding(start = 12.dp),
+                            )
+                        }
+                        DayExpenseLine(expense = expense, onClick = { editingExpense = expense })
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "当日合计 ¥${ExpenseMath.formatCents(expenses.sumOf { it.amountCents })}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
+            }
+
+            Spacer(Modifier.height(22.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 if (record != null) {
                     Box(
                         modifier = Modifier
@@ -214,6 +264,76 @@ fun DayEditSheet(
                 }
             }
         }
+    }
+
+    if (addingExpense) {
+        ExpenseEditDialog(
+            date = date,
+            initial = null,
+            onSave = { cents, category, expenseNote ->
+                onAddExpense(cents, category, expenseNote)
+                addingExpense = false
+            },
+            onDelete = null,
+            onDismiss = { addingExpense = false },
+        )
+    }
+
+    editingExpense?.let { expense ->
+        ExpenseEditDialog(
+            date = date,
+            initial = expense,
+            onSave = { cents, category, expenseNote ->
+                onUpdateExpense(
+                    expense.copy(amountCents = cents, category = category, note = expenseNote),
+                )
+                editingExpense = null
+            },
+            onDelete = {
+                onDeleteExpense(expense)
+                editingExpense = null
+            },
+            onDismiss = { editingExpense = null },
+        )
+    }
+}
+
+@Composable
+private fun DayExpenseLine(expense: Expense, onClick: () -> Unit) {
+    val ink = LocalExpenseInk.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .clip(CircleShape)
+                .background(ink.of(expense.category)),
+        )
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = expenseCategoryLabel(expense.category),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            if (expense.note.isNotBlank()) {
+                Text(
+                    text = expense.note,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
+        }
+        Text(
+            text = "¥${ExpenseMath.formatCents(expense.amountCents)}",
+            style = MaterialTheme.typography.labelLarge,
+            fontFamily = NumberFont,
+        )
     }
 }
 
@@ -323,14 +443,4 @@ private fun ClockField(value: String, onChange: (String) -> Unit) {
     }
 }
 
-private fun validationProblem(record: DayRecord): String? {
-    if (record.status != DayStatus.work) return null
-    if (record.segments.isEmpty()) return "请至少添加一个时间段"
-    record.segments.forEachIndexed { index, segment ->
-        if (WorkMath.segmentMinutes(segment) == null) {
-            return "第 ${index + 1} 段的结束时间必须晚于开始时间"
-        }
-    }
-    if (WorkMath.netMinutes(record) <= 0) return "休息时间不小于工作时长，净工时为 0"
-    return null
-}
+

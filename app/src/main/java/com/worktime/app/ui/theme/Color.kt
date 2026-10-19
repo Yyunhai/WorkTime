@@ -5,6 +5,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import com.worktime.app.data.DayStatus
+import com.worktime.app.data.ExpenseCategory
 import com.worktime.app.data.ThemeMode
 
 /**
@@ -120,10 +121,52 @@ val DarkDayInk = DayInk(
 
 val LocalDayInk = staticCompositionLocalOf { LightDayInk }
 
+/** 支出分类色，同样按浅色/深色各给一套，保证药丸和分类条都看得清。 */
+data class ExpenseInk(private val colors: Map<ExpenseCategory, Color>) {
+    fun of(category: ExpenseCategory): Color =
+        colors[category] ?: colors.getValue(ExpenseCategory.other)
+}
+
+val LightExpenseInk = ExpenseInk(
+    mapOf(
+        ExpenseCategory.food to Color(0xFFB0447C),
+        ExpenseCategory.transport to Color(0xFF3F63B5),
+        ExpenseCategory.shopping to Color(0xFFB4712A),
+        ExpenseCategory.home to Color(0xFF2E7D62),
+        ExpenseCategory.entertainment to Color(0xFF7E57A8),
+        ExpenseCategory.health to Color(0xFFB3453E),
+        ExpenseCategory.other to Color(0xFF6F6A75),
+    ),
+)
+
+val DarkExpenseInk = ExpenseInk(
+    mapOf(
+        ExpenseCategory.food to Color(0xFFFFA8CF),
+        ExpenseCategory.transport to Color(0xFFA8C0FF),
+        ExpenseCategory.shopping to Color(0xFFF0B872),
+        ExpenseCategory.home to Color(0xFF7FD3B2),
+        ExpenseCategory.entertainment to Color(0xFFD4B5F0),
+        ExpenseCategory.health to Color(0xFFFFB4AB),
+        ExpenseCategory.other to Color(0xFFCAC4CF),
+    ),
+)
+
+val LocalExpenseInk = staticCompositionLocalOf { LightExpenseInk }
+
 fun statusLabel(status: DayStatus): String = when (status) {
     DayStatus.work -> "工作"
     DayStatus.rest -> "休息"
     DayStatus.leave -> "请假"
+}
+
+fun expenseCategoryLabel(category: ExpenseCategory): String = when (category) {
+    ExpenseCategory.food -> "餐饮"
+    ExpenseCategory.transport -> "交通"
+    ExpenseCategory.shopping -> "购物"
+    ExpenseCategory.home -> "居住"
+    ExpenseCategory.entertainment -> "娱乐"
+    ExpenseCategory.health -> "医疗"
+    ExpenseCategory.other -> "其他"
 }
 
 fun themeLabel(mode: ThemeMode): String = when (mode) {

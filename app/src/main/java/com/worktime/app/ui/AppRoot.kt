@@ -37,9 +37,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.worktime.app.AppViewModel
 import com.worktime.app.R
+import com.worktime.app.data.StoreRepository
 import com.worktime.app.ui.theme.NumberFont
 import com.worktime.app.ui.theme.WorkTimeTheme
 import java.time.LocalDate
@@ -50,6 +52,7 @@ import kotlinx.coroutines.launch
 fun AppRoot(vm: AppViewModel) {
     val store by vm.store.collectAsState()
     val loaded by vm.loaded.collectAsState()
+    val loadError by vm.loadError.collectAsState()
     val pendingImport by vm.pendingImport.collectAsState()
     val busy by vm.busy.collectAsState()
 
@@ -59,11 +62,25 @@ fun AppRoot(vm: AppViewModel) {
         var editingDate by remember { mutableStateOf<LocalDate?>(null) }
         var showSettings by remember { mutableStateOf(false) }
         val snackbarHostState = remember { SnackbarHostState() }
-        val pagerState = rememberPagerState(pageCount = { 2 })
+        val pagerState = rememberPagerState(pageCount = { 3 })
         val scope = rememberCoroutineScope()
 
         LaunchedEffect(vm) {
             vm.messages.collect { snackbarHostState.showSnackbar(it) }
+        }
+
+        LaunchedEffect(loadError) {
+            when (val error = loadError) {
+                is StoreRepository.LoadError.Corrupt -> snackbarHostState.showSnackbar(
+                    "数据文件损坏，已另存为 ${error.archive?.name ?: "备份文件"}，本次以空数据启动",
+                )
+
+                is StoreRepository.LoadError.Failed -> snackbarHostState.showSnackbar(
+                    "读取数据失败，暂时无法保存：${error.cause.message ?: "未知错误"}",
+                )
+
+                null -> Unit
+            }
         }
 
         val exportLauncher = rememberLauncherForActivityResult(
@@ -85,13 +102,13 @@ fun AppRoot(vm: AppViewModel) {
                         onPrevious = { shownMonth = shownMonth.minusMonths(1) },
                         onNext = { shownMonth = shownMonth.plusMonths(1) },
                         onBackToCurrentMonth = { shownMonth = YearMonth.from(today) },
-                        onSettings = { showSettings = true },
+                        onSettings = { if (loaded) showSettings = true },
                         onSelectPage = { page -> scope.launch { pagerState.animateScrollToPage(page) } },
                     )
                 },
                 snackbarHost = { SnackbarHost(snackbarHostState) },
                 floatingActionButton = {
-                    if (pagerState.currentPage == 0) {
+                    if (pagerState.currentPage == 0 && loaded) {
                         ExtendedFloatingActionButton(
                             onClick = { editingDate = today },
                             containerColor = MaterialTheme.colorScheme.primary,
@@ -113,13 +130,28 @@ fun AppRoot(vm: AppViewModel) {
                             month = shownMonth,
                             store = store,
                             today = today,
-                            onDayClick = { editingDate = it },
+                            onDayClick = { if (loaded) editingDate = it },
                         )
 
-                        else -> StatsScreen(
+                        1 -> StatsScreen(
                             month = shownMonth,
                             store = store,
-                            onDayClick = { editingDate = it },
+                            onDayClick = { if (loaded) editingDate = it },
+                        )
+
+                        else -> ExpenseScreen(
+                            month = shownMonth,
+                            store = store,
+                            today = today,
+                            onAdd = { date, cents, category, note ->
+                                scope.launch { vm.addExpense(date, cents, category, note) }
+                            },
+                            onUpdate = { date, expense ->
+                                scope.launch { vm.updateExpense(date, expense) }
+                            },
+                            onDelete = { date, expense ->
+                                scope.launch { vm.deleteExpense(date, expense.id) }
+                            },
                         )
                     }
                 }
@@ -129,13 +161,25 @@ fun AppRoot(vm: AppViewModel) {
                 DayEditSheet(
                     date = date,
                     record = store.records[date.toString()],
+                    expenses = store.expenses[date.toString()].orEmpty(),
+                    onAddExpense = { cents, category, note ->
+                        scope.launch { vm.addExpense(date, cents, category, note) }
+                    },
+                    onUpdateExpense = { expense ->
+                        scope.launch { vm.updateExpense(date, expense) }
+                    },
+                    onDeleteExpense = { expense ->
+                        scope.launch { vm.deleteExpense(date, expense.id) }
+                    },
                     onSave = { record ->
-                        vm.saveDay(date, record)
-                        editingDate = null
+                        scope.launch {
+                            if (vm.saveDay(date, record)) editingDate = null
+                        }
                     },
                     onDelete = {
-                        vm.deleteDay(date)
-                        editingDate = null
+                        scope.launch {
+                            if (vm.deleteDay(date)) editingDate = null
+                        }
                     },
                     onDismiss = { editingDate = null },
                 )
@@ -161,9 +205,9 @@ fun AppRoot(vm: AppViewModel) {
                     title = { Text("确认导入") },
                     text = {
                         Text(
-                            "备份中有 ${pending.plan.affectedDays} 天记录：" +
+                            "备份中有 ${pending.plan.affectedDays} 天数据：" +
                                 "新增 ${pending.plan.adding} 天，覆盖 ${pending.plan.overwriting} 天。" +
-                                "覆盖会用备份里的内容替换本机同名日期的记录。",
+                                "覆盖会用备份里的记录与支出替换本机同名日期的内容。",
                         )
                     },
                     confirmButton = {
@@ -175,7 +219,7 @@ fun AppRoot(vm: AppViewModel) {
                 )
             }
 
-            LaunchArt(enabled = loaded && store.settings.launchArt)
+            LaunchArt(loaded = loaded, enabled = store.settings.launchArt)
         }
     }
 }
@@ -204,14 +248,22 @@ private fun AppTopBar(
                 Text(
                     text = "工作记录",
                     style = MaterialTheme.typography.titleLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
                 SegmentedPills(
-                    options = listOf(0, 1),
+                    options = listOf(0, 1, 2),
                     selected = page,
-                    labelOf = { if (it == 0) "月历" else "统计" },
+                    labelOf = {
+                        when (it) {
+                            0 -> "月历"
+                            1 -> "统计"
+                            else -> "支出"
+                        }
+                    },
                     onSelect = onSelectPage,
-                    modifier = Modifier.width(150.dp),
+                    modifier = Modifier.width(168.dp),
                 )
                 TonalIconButton(onClick = onSettings, icon = R.drawable.ic_more, description = "设置")
             }

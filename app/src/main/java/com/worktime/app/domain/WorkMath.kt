@@ -39,12 +39,26 @@ object WorkMath {
         return (segmentsMinutes(record.segments) - record.breakMinutes).coerceAtLeast(0)
     }
 
-    fun isRecordValid(record: DayRecord): Boolean = when (record.status) {
-        DayStatus.work -> record.segments.isNotEmpty() &&
-            record.segments.all { segmentMinutes(it) != null } &&
-            netMinutes(record) > 0
-        else -> record.segments.isEmpty()
+    /** 单条记录的校验：返回给用户看的问题描述，null 表示合法。 */
+    fun validationProblem(record: DayRecord): String? {
+        if (record.status != DayStatus.work) {
+            return if (record.segments.isEmpty()) null else "休息或请假日不需要时间段"
+        }
+        if (record.segments.isEmpty()) return "请至少添加一个时间段"
+        record.segments.forEachIndexed { index, segment ->
+            if (segmentMinutes(segment) == null) {
+                return "第 ${index + 1} 段的结束时间必须晚于开始时间"
+            }
+        }
+        if (netMinutes(record) <= 0) return "休息时间不小于工作时长，净工时为 0"
+        return null
     }
+
+    fun isRecordValid(record: DayRecord): Boolean = validationProblem(record) == null
+
+    /** 过滤掉导入备份里无法参与统计的记录（坏时间段、净工时为 0、非工作日带时间段）。 */
+    fun sanitize(store: Store): Store =
+        store.copy(records = store.records.filterValues { isRecordValid(it) })
 
     fun recordOf(store: Store, date: LocalDate): DayRecord? = store.records[date.toString()]
 
@@ -72,8 +86,12 @@ object WorkMath {
             val record = store.records[day.toString()]
             when (record?.status) {
                 DayStatus.work -> {
-                    work++
-                    total += netMinutes(record)
+                    // 与 README 一致：净工时为 0 的上班日不计入出勤与总工时。
+                    val net = netMinutes(record)
+                    if (net > 0) {
+                        work++
+                        total += net
+                    }
                 }
 
                 DayStatus.rest -> rest++

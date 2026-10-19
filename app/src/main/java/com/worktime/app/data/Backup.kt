@@ -11,6 +11,7 @@ object Backup {
 
     private val json = Json {
         ignoreUnknownKeys = true
+        coerceInputValues = true
         prettyPrint = true
     }
 
@@ -44,11 +45,16 @@ object Backup {
         }
 
     fun plan(current: Store, incoming: Store): ImportPlan {
-        val overwriting = incoming.records.keys.count { it in current.records }
-        return ImportPlan(adding = incoming.records.size - overwriting, overwriting = overwriting)
+        val dates = incoming.records.keys + incoming.expenses.keys
+        val existing = current.records.keys + current.expenses.keys
+        val overwriting = dates.count { it in existing }
+        return ImportPlan(adding = dates.size - overwriting, overwriting = overwriting)
     }
 
-    /** 导入侧按日期覆盖现有记录，设置项保留本机当前值。 */
+    /** 导入侧按日期覆盖现有的记录与支出，设置项保留本机当前值。 */
     fun merge(current: Store, incoming: Store): Store =
-        current.copy(records = current.records + incoming.records)
+        current.copy(
+            records = current.records + incoming.records,
+            expenses = current.expenses + incoming.expenses,
+        )
 }

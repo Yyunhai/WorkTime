@@ -25,6 +25,24 @@ val signingKeyPassword = signingValue("RELEASE_KEY_PASSWORD", "keyPassword")
 val signingReady = listOf<Any?>(signingStoreFile, signingStorePassword, signingKeyAlias, signingKeyPassword)
     .all { it != null }
 
+// 版本号来自 tag：v<major>.<minor>[.<patch>]，"-" 之后的内容只进 versionName。
+// versionCode 用固定权重编码，保证 v1.100 < v2.0；旧编码（1、10、110…）都小于第一条新编码。
+val tagName = providers.environmentVariable("TAG_NAME").orElse("v1.0").get().trim()
+val cleanVersion = tagName.removePrefix("v").removePrefix("V")
+val versionParts = cleanVersion.substringBefore('-').split('.').map { it.toIntOrNull() }
+require(versionParts.size in 2..3 && versionParts.all { it != null }) {
+    "TAG_NAME 需形如 v1.2 或 v1.2.3，当前为：$tagName"
+}
+val versionMajor = versionParts[0]!!
+val versionMinor = versionParts[1]!!
+val versionPatch = versionParts.getOrNull(2) ?: 0
+require(versionMajor in 0..2147 && versionMinor in 0..999 && versionPatch in 0..999) {
+    "版本号超出可编码范围（minor/patch 最大 999）：$tagName"
+}
+val derivedVersionCode = versionMajor * 1_000_000 + versionMinor * 1_000 + versionPatch
+// 逃生口：需要重发已被占用的 versionCode 时，用环境变量显式指定。
+val overrideVersionCode = providers.environmentVariable("VERSION_CODE").getOrNull()?.toIntOrNull()
+
 android {
     namespace = "com.worktime.app"
     compileSdk = 37
@@ -46,11 +64,8 @@ android {
         targetSdk = 36
         //versionCode = 1
         //versionName = "1.0"
-        val tagName = System.getenv("TAG_NAME") ?: "v1.0"
-        val cleanVersion = tagName.removePrefix("v")
-
         versionName = cleanVersion
-        versionCode = cleanVersion.replace(".", "").toIntOrNull() ?: 1
+        versionCode = overrideVersionCode ?: derivedVersionCode
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

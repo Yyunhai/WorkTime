@@ -1,14 +1,20 @@
 package com.worktime.app
 
 import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.worktime.app.data.Backup
 import com.worktime.app.data.DayRecord
+import com.worktime.app.data.Expense
+import com.worktime.app.data.ExpenseCategory
 import com.worktime.app.data.Store
 import com.worktime.app.data.StoreRepository
 import com.worktime.app.data.ThemeMode
+import com.worktime.app.domain.ExpenseMath
+import com.worktime.app.domain.WorkMath
 import java.time.LocalDate
+import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -20,7 +26,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import android.net.Uri
 
 class AppViewModel(
     private val repository: StoreRepository,
@@ -31,6 +36,7 @@ class AppViewModel(
 
     val store: StateFlow<Store> = repository.store
     val loaded: StateFlow<Boolean> = repository.loaded
+    val loadError: StateFlow<StoreRepository.LoadError?> = repository.loadError
 
     private val _messages = MutableSharedFlow<String>(
         replay = 0,
@@ -47,24 +53,92 @@ class AppViewModel(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
-    fun saveDay(date: LocalDate, record: DayRecord) {
+    suspend fun saveDay(date: LocalDate, record: DayRecord): Boolean {
         val key = date.toString()
-        val ok = repository.update { it.copy(records = it.records + (key to record)) }
-        _messages.tryEmit(if (ok) "已保存 $key" else "写入失败，请重试")
+        return guardedUpdate(
+            transform = { it.copy(records = it.records + (key to record)) },
+            success = "已保存 $key",
+            failure = "写入失败，请重试",
+        )
     }
 
-    fun deleteDay(date: LocalDate) {
+    suspend fun deleteDay(date: LocalDate): Boolean {
         val key = date.toString()
-        val ok = repository.update { it.copy(records = it.records - key) }
-        _messages.tryEmit(if (ok) "已删除 $key 的记录" else "写入失败，请重试")
+        return guardedUpdate(
+            transform = { it.copy(records = it.records - key) },
+            success = "已删除 $key 的记录",
+            failure = "写入失败，请重试",
+        )
+    }
+
+    suspend fun addExpense(
+        date: LocalDate,
+        amountCents: Long,
+        category: ExpenseCategory,
+        note: String,
+    ): Boolean {
+        val expense = Expense(
+            id = UUID.randomUUID().toString(),
+            amountCents = amountCents,
+            category = category,
+            note = note.trim(),
+        )
+        return mutateExpenses(
+            date = date,
+            success = "已记 ¥${ExpenseMath.formatCents(amountCents)}",
+            failure = "写入失败，请重试",
+        ) { it + expense }
+    }
+
+    suspend fun updateExpense(date: LocalDate, expense: Expense): Boolean {
+        val normalized = expense.copy(note = expense.note.trim())
+        return mutateExpenses(
+            date = date,
+            success = "已更新支出",
+            failure = "写入失败，请重试",
+        ) { list -> list.map { if (it.id == normalized.id) normalized else it } }
+    }
+
+    suspend fun deleteExpense(date: LocalDate, expenseId: String): Boolean =
+        mutateExpenses(
+            date = date,
+            success = "已删除支出",
+            failure = "写入失败，请重试",
+        ) { list -> list.filterNot { it.id == expenseId } }
+
+    private suspend fun mutateExpenses(
+        date: LocalDate,
+        success: String,
+        failure: String,
+        transform: (List<Expense>) -> List<Expense>,
+    ): Boolean {
+        val key = date.toString()
+        return guardedUpdate(
+            transform = { store ->
+                val next = transform(store.expenses[key].orEmpty())
+                store.copy(
+                    expenses = if (next.isEmpty()) {
+                        store.expenses - key
+                    } else {
+                        store.expenses + (key to next)
+                    },
+                )
+            },
+            success = success,
+            failure = failure,
+        )
     }
 
     fun setTheme(mode: ThemeMode) {
-        repository.update { it.copy(settings = it.settings.copy(theme = mode)) }
+        scope.launch {
+            repository.update { it.copy(settings = it.settings.copy(theme = mode)) }
+        }
     }
 
     fun setLaunchArt(enabled: Boolean) {
-        repository.update { it.copy(settings = it.settings.copy(launchArt = enabled)) }
+        scope.launch {
+            repository.update { it.copy(settings = it.settings.copy(launchArt = enabled)) }
+        }
     }
 
     fun exportTo(uri: Uri) {
@@ -79,13 +153,23 @@ class AppViewModel(
     fun previewImport(uri: Uri) {
         scope.launch {
             _busy.value = true
-            val incoming = Backup.read(appContext, uri)
+            val raw = Backup.read(appContext, uri)
             _busy.value = false
-            if (incoming == null) {
+            if (raw == null) {
                 _messages.tryEmit("文件无法读取")
-            } else {
-                _pendingImport.value = PendingImport(Backup.plan(store.value, incoming), incoming)
+                return@launch
             }
+            // 导入前先过滤掉无法参与统计的记录/支出，避免坏数据混进本机。
+            val incoming = ExpenseMath.sanitize(WorkMath.sanitize(raw))
+            val droppedDays = raw.records.size - incoming.records.size
+            val droppedExpenses = raw.expenses.values.sumOf { it.size } -
+                incoming.expenses.values.sumOf { it.size }
+            val skipped = listOfNotNull(
+                droppedDays.takeIf { it > 0 }?.let { "$it 天无效记录" },
+                droppedExpenses.takeIf { it > 0 }?.let { "$it 笔无效支出" },
+            )
+            if (skipped.isNotEmpty()) _messages.tryEmit("已忽略 ${skipped.joinToString("、")}")
+            _pendingImport.value = PendingImport(Backup.plan(store.value, incoming), incoming)
         }
     }
 
@@ -95,16 +179,33 @@ class AppViewModel(
 
     fun applyImport() {
         val pending = _pendingImport.value ?: return
-        val ok = repository.replace(Backup.merge(store.value, pending.incoming))
         _pendingImport.value = null
-        _messages.tryEmit(
-            if (ok) "已导入 ${pending.plan.affectedDays} 天" else "导入失败"
-        )
+        scope.launch {
+            val ok = repository.replace(Backup.merge(store.value, pending.incoming))
+            _messages.tryEmit(if (ok) "已导入 ${pending.plan.affectedDays} 天" else "导入失败")
+        }
     }
 
     fun clearAll() {
-        val ok = repository.replace(Store(settings = store.value.settings))
-        _messages.tryEmit(if (ok) "已清空全部记录" else "清空失败")
+        scope.launch {
+            val ok = repository.replace(Store(settings = store.value.settings))
+            _messages.tryEmit(if (ok) "已清空全部记录" else "清空失败")
+        }
+    }
+
+    /** 加载完成前拒绝写入，避免用空的初始 Store 覆盖磁盘上的旧记录。 */
+    private suspend fun guardedUpdate(
+        transform: (Store) -> Store,
+        success: String,
+        failure: String,
+    ): Boolean {
+        if (!loaded.value) {
+            _messages.tryEmit("数据还在加载，请稍候")
+            return false
+        }
+        val ok = repository.update(transform)
+        _messages.tryEmit(if (ok) success else failure)
+        return ok
     }
 
     companion object {
