@@ -19,6 +19,7 @@ fun WorkTimeTheme(
 
     CompositionLocalProvider(
         LocalDayInk provides if (dark) DarkDayInk else LightDayInk,
+        LocalExpenseInk provides if (dark) DarkExpenseInk else LightExpenseInk,
     ) {
         MaterialTheme(
             colorScheme = if (dark) DarkScheme else LightScheme,

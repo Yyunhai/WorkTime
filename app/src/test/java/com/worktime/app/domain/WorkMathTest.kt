@@ -119,6 +119,60 @@ class WorkMathTest {
     }
 
     @Test
+    fun nonWorkDayWithSegmentsIsInvalid() {
+        assertFalse(
+            WorkMath.isRecordValid(
+                DayRecord(status = DayStatus.rest, segments = listOf(Segment("09:00", "10:00"))),
+            ),
+        )
+    }
+
+    @Test
+    fun zeroNetWorkDayIsNotAttendance() {
+        val month = YearMonth.of(2026, 10)
+        val store = Store(
+            records = mapOf("2026-10-08" to work("09:00" to "10:00", breakMinutes = 60)),
+        )
+
+        val summary = WorkMath.summarize(month, store)
+
+        assertEquals(0, summary.workDays)
+        assertEquals(0, summary.totalMinutes)
+        assertEquals(0, summary.averageMinutes)
+    }
+
+    @Test
+    fun sanitizeDropsRecordsThatCannotBeCounted() {
+        val store = Store(
+            records = mapOf(
+                "2026-10-08" to work("09:00" to "18:00"),
+                "2026-10-09" to work("22:00" to "02:00"),
+                "2026-10-10" to DayRecord(status = DayStatus.rest),
+                "2026-10-11" to DayRecord(
+                    status = DayStatus.leave,
+                    segments = listOf(Segment("09:00", "10:00")),
+                ),
+            ),
+        )
+
+        assertEquals(setOf("2026-10-08", "2026-10-10"), WorkMath.sanitize(store).records.keys)
+    }
+
+    @Test
+    fun validationProblemExplainsTheFirstIssue() {
+        assertEquals(
+            "请至少添加一个时间段",
+            WorkMath.validationProblem(DayRecord(status = DayStatus.work)),
+        )
+        assertEquals(
+            "第 2 段的结束时间必须晚于开始时间",
+            WorkMath.validationProblem(work("09:00" to "10:00", "12:00" to "11:00")),
+        )
+        assertNull(WorkMath.validationProblem(work("09:00" to "18:00")))
+        assertNull(WorkMath.validationProblem(DayRecord(status = DayStatus.rest)))
+    }
+
+    @Test
     fun durationFormatting() {
         assertEquals("45 分", WorkMath.formatDuration(45))
         assertEquals("8 小时", WorkMath.formatDuration(480))

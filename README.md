@@ -14,6 +14,7 @@
   - 上班可记录多段时间区间（支持上下午分段），自动扣除设定的午休分钟数
   - 可为每天写备注
 - **统计视图**：本月出勤天数、休息 / 请假天数、总工时、日均工时，以及近若干个月的工时趋势。
+- **支出记录**：一天可记多笔支出（金额、分类、备注），提供当月合计、分类汇总与明细；分类内置餐饮 / 交通 / 购物 / 居住 / 娱乐 / 医疗 / 其他。
 - **主题切换**：跟随系统 / 浅色 / 深色。
 - **备份与恢复**：导出为 `worktime-yyyyMM.json`，导入时按日期合并（同名日期覆盖，设置项保留本机值），导入前有变更预览。
 
@@ -69,17 +70,21 @@ app/src/main/java/com/worktime/app/
 ├── MainActivity.kt         # 唯一 Activity，setContent { AppRoot() }
 ├── AppViewModel.kt         # 状态与业务编排（保存/删除/导入导出/主题）
 ├── data/
-│   ├── Models.kt           # 数据模型：Store / DayRecord / Segment / Settings
-│   ├── StoreRepository.kt  # 内存态唯一来源，原子落盘为单个 JSON 文件
+│   ├── Models.kt           # 数据模型：Store / DayRecord / Segment / Expense / Settings
+│   ├── StoreFile.kt        # 单文件原子读写、损坏留档（纯 JVM，可单测）
+│   ├── StoreRepository.kt  # 内存态唯一来源，串行化落盘为单个 JSON 文件
 │   └── Backup.kt           # 通过 SAF 导入导出、合并策略
 ├── domain/
-│   └── WorkMath.kt         # 纯 Kotlin 工时计算（不依赖 Android API，便于单测）
+│   ├── WorkMath.kt         # 纯 Kotlin 工时计算（不依赖 Android API，便于单测）
+│   └── ExpenseMath.kt      # 支出金额解析、月度汇总与导入清洗
 └── ui/
     ├── AppRoot.kt          # 根 Composable：顶栏、翻页、底部面板编排
     ├── CalendarScreen.kt   # 月历视图
     ├── StatsScreen.kt      # 统计视图
-    ├── DayEditSheet.kt     # 每日编辑面板
+    ├── DayEditSheet.kt     # 每日编辑面板（工时 + 当日支出）
     ├── SettingsSheet.kt    # 设置面板（主题 / 备份 / 清空）
+    ├── ExpenseScreen.kt    # 支出页（月度合计 / 分类汇总 / 明细）
+    ├── ExpenseEditDialog.kt # 新增、编辑、删除单笔支出
     ├── ClockPickerDialog.kt
     ├── LaunchArt.kt        # 启动插画
     ├── Components.kt
@@ -88,9 +93,10 @@ app/src/main/java/com/worktime/app/
 
 ## 数据与备份
 
-- 全部记录保存在应用私有目录下的单个 JSON 文件，**无任何权限依赖**。
+- 全部记录与支出保存在应用私有目录下的单个 JSON 文件，**无任何权限依赖**。
 - **卸载应用或清除数据会一并丢失记录**，重装前请先在「设置」中导出备份。
-- 导入采用按日期合并策略：备份中的日期覆盖本机同日期记录，应用设置（如主题）保留本机当前值。
+- 导入采用按日期合并策略：备份中的日期覆盖本机同日期记录与支出，应用设置（如主题）保留本机当前值。
+- 导入时会跳过无法参与统计的坏记录与非法支出（如净工时为 0 的上班日、金额非正的支出），并提示忽略数量。
 
 ### 工时计算规则
 

@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -19,6 +21,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,10 +48,14 @@ fun SettingsSheet(
 ) {
     var askClear by remember { mutableStateOf(false) }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    // 直接完整展开；内容再长也能在面板里滚动，不会被截断在半屏。
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .navigationBarsPadding()
                 .padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
         ) {
@@ -96,8 +103,8 @@ fun SettingsSheet(
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp),
                 )
                 ActionRow(
-                    title = "清空全部记录",
-                    description = "只删本机数据，导出过的备份不受影响",
+                    title = "清空全部数据",
+                    description = "工作记录和支出一起删除，导出过的备份不受影响",
                     enabled = !busy,
                     danger = true,
                     onClick = { askClear = true },
@@ -127,7 +134,7 @@ fun SettingsSheet(
         AlertDialog(
             onDismissRequest = { askClear = false },
             title = { Text("确认清空？") },
-            text = { Text("全部工作记录都会被删除，且无法恢复。建议先导出备份。") },
+            text = { Text("全部工作记录和支出都会被删除，且无法恢复。建议先导出备份。") },
             confirmButton = {
                 TextButton(
                     onClick = {
