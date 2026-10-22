@@ -14,9 +14,9 @@
   - 上班可记录多段时间区间（支持上下午分段），自动扣除设定的午休分钟数
   - 可为每天写备注
 - **统计视图**：本月出勤天数、休息 / 请假天数、总工时、日均工时，以及近若干个月的工时趋势。
-- **支出记录**：一天可记多笔支出（金额、分类、备注），支出页提供当月合计、日均、分类汇总与明细；分类内置餐饮 / 交通 / 购物 / 居住 / 娱乐 / 医疗 / 其他。月历不显示支出，保持工时视图干净。
+- **支出记录**：一天可记多笔支出（金额、分类、备注），支出页提供当月合计、日均、分类汇总与明细；默认分类为餐饮 / 交通 / 购物 / 其他，历史数据和自定义分类会保留。月历不显示支出，保持工时视图干净。
 - **主题切换**：跟随系统 / 浅色 / 深色。
-- **备份与恢复**：导出为 `worktime-yyyyMM.json`，导入时按日期合并（同名日期覆盖，设置项保留本机值），导入前有变更预览。
+- **备份与恢复**：导出为 `worktime-yyyyMM.json`，导入时记录按日期覆盖、支出按 id 去重追加，设置项保留本机值，导入前有变更预览。
 
 ## 技术栈
 
@@ -25,8 +25,9 @@
 | 语言 | Kotlin 2.2.10 |
 | UI | Jetpack Compose（Material 3）、Compose BOM 2026.02.01 |
 | 架构 | 单 Activity + `ViewModel` + `StateFlow`，手写仓库层 |
-| 并发与存储 | Coroutines + `Mutex` 串行化读写，`fsync` + 原子改名落盘 |
-| 序列化 | kotlinx.serialization（JSON） |
+| 本地存储 | Room 2.8.5（KSP）+ DataStore Preferences |
+| 数据访问 | DAO 返回 `Flow`，按日期范围 `BETWEEN` 查询；统计在 SQL 里完成 |
+| 序列化 | kotlinx.serialization（仅备份 JSON，基于 org.json 做旧数据迁移） |
 | 构建 | Gradle 9.5.0（Wrapper）、AGP 9.3.2、版本目录 `libs.versions.toml` |
 | SDK | minSdk 31 / targetSdk 36 / compileSdk 37 |
 | Java | 源码与目标兼容级别 11 |
@@ -54,7 +55,7 @@ sdk.dir=/path/to/Android/Sdk
 # 安装到已连接的设备 / 模拟器
 ./gradlew installDebug
 
-# 运行单元测试（工时/支出计算、文件读写、备份合并）
+# 运行单元测试（工时/支出计算、备份 JSON、分类映射）
 ./gradlew test
 
 # 运行仪器测试（需连接设备）
@@ -89,13 +90,20 @@ app/src/main/java/com/worktime/app/
 ├── MainActivity.kt         # 唯一 Activity，setContent { AppRoot() }
 ├── AppViewModel.kt         # 状态与业务编排（记录/支出/导入导出/主题）
 ├── data/
-│   ├── Models.kt           # 数据模型：Store / DayRecord / Segment / Expense / Settings
-│   ├── StoreFile.kt        # 单文件原子读写、损坏留档（纯 JVM，可单测）
-│   ├── StoreRepository.kt  # 内存态唯一来源，串行化落盘为单个 JSON 文件
-│   └── Backup.kt           # 通过 SAF 导入导出、合并策略
+│   ├── Models.kt           # 数据模型：DayRecord / Segment / Expense / ExpenseCategory / Settings
+│   ├── WorkRepository.kt   # Room + DataStore 的统一入口，组装月度数据
+│   ├── SettingsStore.kt    # 主题 / 开屏图开关（DataStore）
+│   ├── Backup.kt           # 备份 JSON 的结构与 SAF 读写
+│   ├── LegacyJsonImporter.kt # 旧版 data.json 一次性迁移（事务、失败回滚）
+│   ├── CategoryMapping.kt  # 旧分类标识与分类名的映射
+│   └── db/
+│       ├── Entities.kt     # day_record / segment / expense_category / expense
+│       ├── Daos.kt         # 日期范围 Flow、统计查询、事务保存
+│       └── AppDatabase.kt  # Room 数据库、默认分类、schema 导出
 ├── domain/
 │   ├── WorkMath.kt         # 纯 Kotlin 工时计算（不依赖 Android API，便于单测）
-│   └── ExpenseMath.kt      # 支出金额解析、月度汇总与导入清洗
+│   ├── ExpenseMath.kt      # 支出金额解析与格式化
+│   └── MonthData.kt        # 当前月份的数据快照（记录 / 统计 / 支出）
 └── ui/
     ├── AppRoot.kt          # 根 Composable：顶栏、翻页、底部面板编排
     ├── CalendarScreen.kt   # 月历视图
@@ -109,6 +117,18 @@ app/src/main/java/com/worktime/app/
     ├── Components.kt
     └── theme/              # 颜色、字体、主题
 ```
+
+## 数据与备份
+
+- 工时与支出保存在应用私有目录的 Room 数据库 `worktime.db`，设置保存在 DataStore；不再使用单个 JSON 文件。
+- 从旧版本升级时，启动会自动把 `files/worktime/data.json` 迁入 Room；成功后改名为 `data.json.bak`，失败则整体回滚、保留原文件并在下次启动重试。
+- 支出金额仍以「分」存整数；旧数据里的 `food` / `shopping` 等分类标识会映射到分类表，无法识别的分类会按原名新建，不会丢数据。
+- 导出 / 导入仍是 JSON（`worktime-yyyyMM.json`），结构保持 `settings` / `records` / `expenses`，方便查看和跨版本备份；支出用 `externalId` 去重。
+- Room 的 schema 导出在 `app/schemas/`，后续修改表结构时用于编写 Migration。
+
+## 隐私
+
+应用不声明任何权限、不进行任何网络请求，数据仅保存在本机应用私有目录。
 
 ## 许可证
 

@@ -53,7 +53,6 @@ import com.worktime.app.domain.WorkMath
 import com.worktime.app.ui.theme.LocalDayInk
 import com.worktime.app.ui.theme.LocalExpenseInk
 import com.worktime.app.ui.theme.NumberFont
-import com.worktime.app.ui.theme.expenseCategoryLabel
 import com.worktime.app.ui.theme.statusLabel
 import java.time.LocalDate
 
@@ -63,7 +62,8 @@ fun DayEditSheet(
     date: LocalDate,
     record: DayRecord?,
     expenses: List<Expense>,
-    onAddExpense: (amountCents: Long, category: ExpenseCategory, note: String) -> Unit,
+    categories: List<ExpenseCategory>,
+    onAddExpense: (amountCents: Long, categoryId: Long?, note: String) -> Unit,
     onUpdateExpense: (Expense) -> Unit,
     onDeleteExpense: (Expense) -> Unit,
     onSave: (DayRecord) -> Unit,
@@ -270,8 +270,9 @@ fun DayEditSheet(
         ExpenseEditDialog(
             date = date,
             initial = null,
-            onSave = { cents, category, expenseNote ->
-                onAddExpense(cents, category, expenseNote)
+            categories = categories,
+            onSave = { cents, categoryId, expenseNote ->
+                onAddExpense(cents, categoryId, expenseNote)
                 addingExpense = false
             },
             onDelete = null,
@@ -283,9 +284,10 @@ fun DayEditSheet(
         ExpenseEditDialog(
             date = date,
             initial = expense,
-            onSave = { cents, category, expenseNote ->
+            categories = categories,
+            onSave = { cents, categoryId, expenseNote ->
                 onUpdateExpense(
-                    expense.copy(amountCents = cents, category = category, note = expenseNote),
+                    expense.copy(amountCents = cents, categoryId = categoryId, note = expenseNote),
                 )
                 editingExpense = null
             },
@@ -312,12 +314,12 @@ private fun DayExpenseLine(expense: Expense, onClick: () -> Unit) {
             modifier = Modifier
                 .size(8.dp)
                 .clip(CircleShape)
-                .background(ink.of(expense.category)),
+                .background(ink.of(expense.categoryName)),
         )
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(
-                text = expenseCategoryLabel(expense.category),
+                text = expense.categoryName ?: "未分类",
                 style = MaterialTheme.typography.bodyMedium,
             )
             if (expense.note.isNotBlank()) {

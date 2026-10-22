@@ -1,14 +1,14 @@
 package com.worktime.app
 
 import android.app.Application
-import com.worktime.app.data.StoreRepository
+import com.worktime.app.data.WorkRepository
 
 class WorkTimeApp : Application() {
 
-    val repository: StoreRepository by lazy { StoreRepository(this) }
+    val repository: WorkRepository by lazy { WorkRepository(this) }
 
     override fun onCreate() {
         super.onCreate()
-        repository.startLoad()
+        repository.start()
     }
 }

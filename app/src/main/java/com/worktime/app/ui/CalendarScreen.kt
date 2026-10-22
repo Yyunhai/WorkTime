@@ -30,7 +30,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.worktime.app.data.DayRecord
 import com.worktime.app.data.DayStatus
-import com.worktime.app.data.Store
 import com.worktime.app.domain.WorkMath
 import com.worktime.app.ui.theme.LocalDayInk
 import com.worktime.app.ui.theme.NumberFont
@@ -40,13 +39,12 @@ import java.time.YearMonth
 @Composable
 fun CalendarScreen(
     month: YearMonth,
-    store: Store,
+    records: Map<String, DayRecord>,
+    summary: WorkMath.MonthSummary,
     today: LocalDate,
     onDayClick: (LocalDate) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val summary = WorkMath.summarize(month, store)
-
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -57,7 +55,7 @@ fun CalendarScreen(
         Spacer(Modifier.height(22.dp))
         WeekdayHeader()
         Spacer(Modifier.height(6.dp))
-        MonthGrid(month = month, store = store, today = today, onDayClick = onDayClick)
+        MonthGrid(month = month, records = records, today = today, onDayClick = onDayClick)
         Spacer(Modifier.height(18.dp))
         LegendRow()
         Text(
@@ -120,7 +118,7 @@ private fun WeekdayHeader() {
 @Composable
 private fun MonthGrid(
     month: YearMonth,
-    store: Store,
+    records: Map<String, DayRecord>,
     today: LocalDate,
     onDayClick: (LocalDate) -> Unit,
 ) {
@@ -137,7 +135,7 @@ private fun MonthGrid(
                             val date = month.atDay(dayOfMonth)
                             DayCell(
                                 date = date,
-                                record = store.records[date.toString()],
+                                record = records[date.toString()],
                                 isToday = date == today,
                                 onClick = { onDayClick(date) },
                             )
