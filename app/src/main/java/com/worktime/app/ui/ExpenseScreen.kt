@@ -38,7 +38,9 @@ import com.worktime.app.data.ExpenseCategory
 import com.worktime.app.domain.CategoryTotal
 import com.worktime.app.domain.ExpenseMath
 import com.worktime.app.ui.theme.LocalExpenseInk
+import com.worktime.app.ui.theme.LocalPinkTheme
 import com.worktime.app.ui.theme.NumberFont
+import com.worktime.app.ui.theme.PinkMoneyInk
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -59,6 +61,7 @@ fun ExpenseScreen(
     val average = if (dayCount == 0) 0L else totalCents / dayCount
     val isCurrentMonth = YearMonth.from(today) == month
     val defaultDate = if (isCurrentMonth) today else month.atDay(1)
+    val pink = LocalPinkTheme.current
 
     var adding by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Expense?>(null) }
@@ -81,10 +84,14 @@ fun ExpenseScreen(
                     text = "¥${ExpenseMath.formatCents(totalCents)}",
                     style = MaterialTheme.typography.displaySmall,
                     fontFamily = NumberFont,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = if (pink) PinkMoneyInk else MaterialTheme.colorScheme.primary,
                 )
             }
-            Button(onClick = { adding = true }, shape = RoundedCornerShape(999.dp)) {
+            Button(
+                onClick = { adding = true },
+                shape = RoundedCornerShape(999.dp),
+                colors = primaryButtonColors(),
+            ) {
                 Icon(
                     painterResource(R.drawable.ic_plus),
                     contentDescription = null,
@@ -183,6 +190,7 @@ fun ExpenseScreen(
 @Composable
 private fun CategoryBar(name: String, cents: Long, total: Long) {
     val ink = LocalExpenseInk.current
+    val pink = LocalPinkTheme.current
     val color = ink.of(name)
     val fraction = if (total <= 0) 0f else (cents.toFloat() / total).coerceIn(0f, 1f)
 
@@ -204,7 +212,7 @@ private fun CategoryBar(name: String, cents: Long, total: Long) {
                 text = "¥${ExpenseMath.formatCents(cents)}",
                 style = MaterialTheme.typography.labelLarge,
                 fontFamily = NumberFont,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = if (pink) PinkMoneyInk else MaterialTheme.colorScheme.onSurface,
             )
         }
         Spacer(Modifier.height(6.dp))
@@ -229,6 +237,7 @@ private fun CategoryBar(name: String, cents: Long, total: Long) {
 @Composable
 private fun ExpenseLine(expense: Expense, onClick: () -> Unit) {
     val ink = LocalExpenseInk.current
+    val pink = LocalPinkTheme.current
     val categoryName = expense.categoryName ?: "未分类"
     Row(
         modifier = Modifier
@@ -263,6 +272,7 @@ private fun ExpenseLine(expense: Expense, onClick: () -> Unit) {
             text = "¥${ExpenseMath.formatCents(expense.amountCents)}",
             style = MaterialTheme.typography.labelLarge,
             fontFamily = NumberFont,
+            color = if (pink) PinkMoneyInk else MaterialTheme.colorScheme.onSurface,
         )
     }
 }

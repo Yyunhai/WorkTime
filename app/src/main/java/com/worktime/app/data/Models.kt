@@ -18,7 +18,7 @@ data class DayRecord(
     val note: String = "",
 )
 
-enum class ThemeMode { system, light, dark }
+enum class ThemeMode { system, light, dark, pink }
 
 data class Settings(
     val theme: ThemeMode = ThemeMode.system,

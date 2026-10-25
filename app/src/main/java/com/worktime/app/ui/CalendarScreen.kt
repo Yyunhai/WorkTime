@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.worktime.app.data.DayRecord
 import com.worktime.app.data.DayStatus
 import com.worktime.app.domain.WorkMath
+import com.worktime.app.ui.theme.LocalCardAlpha
 import com.worktime.app.ui.theme.LocalDayInk
 import com.worktime.app.ui.theme.NumberFont
 import java.time.LocalDate
@@ -165,11 +166,10 @@ private fun DayCell(
             .padding(3.dp)
             .clip(shape)
             .background(
-                if (record == null) {
-                    MaterialTheme.colorScheme.surfaceContainerLow
-                } else {
-                    ink.tint(record.status, 0.14f)
-                },
+                MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = LocalCardAlpha.current),
+            )
+            .background(
+                if (record == null) Color.Transparent else ink.tint(record.status, 0.14f),
             )
             .then(
                 if (isToday) {

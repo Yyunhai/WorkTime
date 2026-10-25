@@ -35,7 +35,11 @@ class SettingsStore(context: Context) {
         }
 
     suspend fun setTheme(mode: ThemeMode) {
-        context.settingsDataStore.edit { it[Keys.theme] = mode.name }
+        context.settingsDataStore.edit { prefs ->
+            prefs[Keys.theme] = mode.name
+            // 昔涟主题固定使用专属开屏图，顺手关掉随机开屏，避免两个开关互相打架。
+            if (mode == ThemeMode.pink) prefs[Keys.launchArt] = false
+        }
     }
 
     suspend fun setLaunchArt(enabled: Boolean) {

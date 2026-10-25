@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonColors
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -24,7 +26,23 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.worktime.app.ui.theme.LocalCardAlpha
+import com.worktime.app.ui.theme.LocalPinkTheme
 import com.worktime.app.ui.theme.NumberFont
+
+/** 昔涟主题用浅粉白底 + 玫瑰字按钮；其它主题保持默认主色按钮。 */
+@Composable
+fun primaryButtonColors(): ButtonColors {
+    val pink = LocalPinkTheme.current
+    return if (pink) {
+        ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
+    } else {
+        ButtonDefaults.buttonColors()
+    }
+}
 
 @Composable
 fun TonalIconButton(
@@ -113,7 +131,9 @@ fun SoftCard(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(22.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .background(
+                MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = LocalCardAlpha.current),
+            )
             .padding(contentPadding),
         content = content,
     )

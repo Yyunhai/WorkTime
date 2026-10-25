@@ -91,6 +91,53 @@ val DarkScheme = darkColorScheme(
     inverseOnSurface = Color(0xFF313033),
 )
 
+/**
+ * 昔涟主题：纯白 + 樱粉/白粉打底，浅紫罗兰只做少量点缀。
+ * 固定浅色，不跟随系统深色。
+ */
+val PinkScheme = lightColorScheme(
+    primary = Color(0xFFB94E78),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFFFE4EE),
+    onPrimaryContainer = Color(0xFF5A1F36),
+
+    secondary = Color(0xFFE58AAE),
+    onSecondary = Color(0xFF5A2338),
+    secondaryContainer = Color(0xFFFFF0F5),
+    onSecondaryContainer = Color(0xFF5A2338),
+
+    tertiary = Color(0xFFC3A6E3),
+    onTertiary = Color(0xFF3A2A4D),
+    tertiaryContainer = Color(0xFFF6F0FC),
+    onTertiaryContainer = Color(0xFF3A2A4D),
+
+    error = Color(0xFFB3261E),
+    onError = Color(0xFFFFFFFF),
+    errorContainer = Color(0xFFF9DEDC),
+    onErrorContainer = Color(0xFF410E0B),
+
+    background = Color(0xFFFFF9FB),
+    onBackground = Color(0xFF3A2830),
+    surface = Color(0xFFFFFFFF),
+    onSurface = Color(0xFF3A2830),
+    surfaceVariant = Color(0xFFFBEAF1),
+    onSurfaceVariant = Color(0xFF6B5560),
+    outline = Color(0xFFA98E9A),
+    outlineVariant = Color(0xFFF2DCE6),
+
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceContainerLow = Color(0xFFFFF4F8),
+    surfaceContainer = Color(0xFFFFEDF3),
+    surfaceContainerHigh = Color(0xFFFCE3EC),
+    surfaceContainerHighest = Color(0xFFF8D7E4),
+
+    inverseSurface = Color(0xFF3A2830),
+    inverseOnSurface = Color(0xFFFFF4F8),
+)
+
+/** 昔涟主题里金额用的柔和玫瑰粉，比主色浅一点，但仍然清晰。 */
+val PinkMoneyInk = Color(0xFFC95F86)
+
 /** 三种日状态用的语义色，独立于 Material 角色，保证浅色深色都能一眼分辨。 */
 data class DayInk(
     val work: Color,
@@ -110,6 +157,13 @@ val LightDayInk = DayInk(
     work = Color(0xFF6A4C93),
     rest = Color(0xFF2E7D62),
     leave = Color(0xFFB4712A),
+)
+
+/** 昔涟主题下工作状态也跟着偏玫瑰粉，休息/请假保留可区分的青绿与琥珀。 */
+val PinkDayInk = DayInk(
+    work = Color(0xFFB94E78),
+    rest = Color(0xFF3E8E74),
+    leave = Color(0xFFC08A3E),
 )
 
 val DarkDayInk = DayInk(
@@ -161,4 +215,5 @@ fun themeLabel(mode: ThemeMode): String = when (mode) {
     ThemeMode.system -> "跟随系统"
     ThemeMode.light -> "浅色"
     ThemeMode.dark -> "深色"
+    ThemeMode.pink -> "昔涟"
 }

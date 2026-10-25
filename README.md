@@ -15,7 +15,7 @@
   - 可为每天写备注
 - **统计视图**：本月出勤天数、休息 / 请假天数、总工时、日均工时，以及近若干个月的工时趋势。
 - **支出记录**：一天可记多笔支出（金额、分类、备注），支出页提供当月合计、日均、分类汇总与明细；默认分类为餐饮 / 交通 / 购物 / 其他，历史数据和自定义分类会保留。月历不显示支出，保持工时视图干净。
-- **主题切换**：跟随系统 / 浅色 / 深色。
+- **主题切换**：跟随系统 / 浅色 / 深色 / 昔涟；昔涟主题带专属背景与开屏图。
 - **备份与恢复**：导出为 `worktime-yyyyMM.json`，导入时记录按日期覆盖、支出按 id 去重追加，设置项保留本机值，导入前有变更预览。
 
 ## 技术栈
@@ -63,24 +63,6 @@ sdk.dir=/path/to/Android/Sdk
 ```
 
 构建产物位于 `app/build/outputs/apk/`。
-
-### 版本号与签名
-
-版本号从 Git 标签推导，`TAG_NAME` 形如 `v1.2.3`：
-
-- `versionName` 取标签去掉 `v` 后的部分；
-- `versionCode = major*1_000_000 + minor*1_000 + patch`，保证任意版本都递增（例如 `v1.100 < v2.0`）；
-- 需要手动指定时，用环境变量 `VERSION_CODE` 覆盖。
-
-```bash
-# macOS / Linux
-TAG_NAME=v1.2.0 ./gradlew assembleRelease
-
-# Windows PowerShell
-$env:TAG_NAME="v1.2.0"; .\gradlew.bat assembleRelease
-```
-
-Release 签名依次从环境变量 `RELEASE_STORE_FILE` / `RELEASE_STORE_PASSWORD` / `RELEASE_KEY_ALIAS` / `RELEASE_KEY_PASSWORD` 和根目录的 `keystore.properties`（不入库）读取；两处都缺时产出未签名的 `app-release-unsigned.apk`。推送 `v*` 标签会触发 `.github/workflows/release.yml` 自动签名打包并创建 Release。
 
 ## 项目结构
 

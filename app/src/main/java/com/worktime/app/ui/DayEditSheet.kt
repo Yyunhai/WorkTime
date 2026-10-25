@@ -52,7 +52,9 @@ import com.worktime.app.domain.ExpenseMath
 import com.worktime.app.domain.WorkMath
 import com.worktime.app.ui.theme.LocalDayInk
 import com.worktime.app.ui.theme.LocalExpenseInk
+import com.worktime.app.ui.theme.LocalPinkTheme
 import com.worktime.app.ui.theme.NumberFont
+import com.worktime.app.ui.theme.PinkMoneyInk
 import com.worktime.app.ui.theme.statusLabel
 import java.time.LocalDate
 
@@ -70,6 +72,7 @@ fun DayEditSheet(
     onDelete: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val pink = LocalPinkTheme.current
     var status by remember(date) { mutableStateOf(record?.status ?: DayStatus.work) }
     val segments = remember(date) {
         mutableStateListOf<Segment>().apply {
@@ -227,7 +230,7 @@ fun DayEditSheet(
                 Text(
                     text = "当日合计 ¥${ExpenseMath.formatCents(expenses.sumOf { it.amountCents })}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (pink) PinkMoneyInk else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 4.dp),
                 )
             }
@@ -259,6 +262,7 @@ fun DayEditSheet(
                         .weight(1f)
                         .height(50.dp),
                     shape = RoundedCornerShape(16.dp),
+                    colors = primaryButtonColors(),
                 ) {
                     Text(if (record == null) "保存" else "更新")
                 }
@@ -303,6 +307,7 @@ fun DayEditSheet(
 @Composable
 private fun DayExpenseLine(expense: Expense, onClick: () -> Unit) {
     val ink = LocalExpenseInk.current
+    val pink = LocalPinkTheme.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -335,6 +340,7 @@ private fun DayExpenseLine(expense: Expense, onClick: () -> Unit) {
             text = "¥${ExpenseMath.formatCents(expense.amountCents)}",
             style = MaterialTheme.typography.labelLarge,
             fontFamily = NumberFont,
+            color = if (pink) PinkMoneyInk else MaterialTheme.colorScheme.onSurface,
         )
     }
 }
