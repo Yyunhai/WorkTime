@@ -32,8 +32,19 @@ class LegacyJsonImporter(
 
     suspend fun migrateIfNeeded(): Boolean {
         if (!legacyFile.isFile) return false
+
+        // 数据库里已经有数据，说明上一次迁移其实成功了（可能只是归档失败）；
+        // 这时只补写主题并再次尝试归档，避免用旧 JSON 覆盖用户之后的新编辑。
+        val hasExistingData = db.dayRecordDao().allDates().isNotEmpty() ||
+            db.expenseDao().allDates().isNotEmpty()
         val text = withContext(Dispatchers.IO) { legacyFile.readText() }
         val parsed = parse(text)
+
+        if (hasExistingData) {
+            parsed.theme?.let { settingsStore.setThemeName(it) }
+            archive()
+            return false
+        }
 
         db.withTransaction {
             for (record in parsed.records) {

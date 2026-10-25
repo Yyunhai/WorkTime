@@ -122,7 +122,7 @@ fun SettingsSheet(
 
             Spacer(Modifier.height(20.dp))
             Text(
-                text = "数据保存在应用私有目录的单个文件里，卸载应用或清除数据会一起丢失，" +
+                text = "数据保存在本机的数据库和设置文件里，卸载应用或清除数据会一起丢失，" +
                     "所以重装前请先导出备份。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

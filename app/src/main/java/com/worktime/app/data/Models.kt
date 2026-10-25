@@ -4,7 +4,12 @@ import java.time.LocalDate
 
 enum class DayStatus { work, rest, leave }
 
-data class Segment(val start: String, val end: String)
+data class Segment(
+    val start: String,
+    val end: String,
+    /** 结束时间落在次日（跨午夜）；end 仍是 00:00–23:59 的时钟时间。 */
+    val endNextDay: Boolean = false,
+)
 
 data class DayRecord(
     val status: DayStatus,

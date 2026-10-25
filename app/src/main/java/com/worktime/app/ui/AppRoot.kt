@@ -45,11 +45,13 @@ import com.worktime.app.ui.theme.NumberFont
 import com.worktime.app.ui.theme.WorkTimeTheme
 import java.time.LocalDate
 import java.time.YearMonth
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
 fun AppRoot(vm: AppViewModel) {
     val settings by vm.settings.collectAsStateWithLifecycle()
+    val settingsLoaded by vm.settingsLoaded.collectAsStateWithLifecycle()
     val loaded by vm.loaded.collectAsStateWithLifecycle()
     val loadError by vm.loadError.collectAsStateWithLifecycle()
     val monthData by vm.monthData.collectAsStateWithLifecycle()
@@ -58,13 +60,22 @@ fun AppRoot(vm: AppViewModel) {
     val busy by vm.busy.collectAsStateWithLifecycle()
 
     WorkTimeTheme(mode = settings.theme) {
-        val today = remember { LocalDate.now() }
+        var today by remember { mutableStateOf(LocalDate.now()) }
         var shownMonth by remember { mutableStateOf(YearMonth.from(today)) }
         var editingDate by remember { mutableStateOf<LocalDate?>(null) }
         var showSettings by remember { mutableStateOf(false) }
         val snackbarHostState = remember { SnackbarHostState() }
         val pagerState = rememberPagerState(pageCount = { 3 })
         val scope = rememberCoroutineScope()
+
+        // 应用长时间停留（尤其跨过午夜）后，“今天”也要跟着走。
+        LaunchedEffect(Unit) {
+            while (true) {
+                delay(60_000)
+                val now = LocalDate.now()
+                if (now != today) today = now
+            }
+        }
 
         LaunchedEffect(shownMonth) {
             vm.setMonth(shownMonth)
@@ -210,7 +221,7 @@ fun AppRoot(vm: AppViewModel) {
                 )
             }
 
-            LaunchArt(loaded = loaded, enabled = settings.launchArt)
+            LaunchArt(loaded = loaded && settingsLoaded, enabled = settings.launchArt)
         }
     }
 }

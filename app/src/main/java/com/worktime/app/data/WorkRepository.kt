@@ -24,14 +24,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** 数据访问入口：Room 负责记录与支出，DataStore 负责设置。 */
 class WorkRepository(context: Context) {
@@ -48,8 +48,21 @@ class WorkRepository(context: Context) {
     private val _loadError = MutableStateFlow<String?>(null)
     val loadError: StateFlow<String?> = _loadError.asStateFlow()
 
-    val settings: StateFlow<Settings> = settingsStore.settings
-        .stateIn(scope, SharingStarted.Eagerly, Settings())
+    private val _settings = MutableStateFlow(Settings())
+    val settings: StateFlow<Settings> = _settings.asStateFlow()
+
+    /** 设置是否已经从 DataStore 读出；界面用它决定能否展示开屏图/应用主题。 */
+    private val _settingsLoaded = MutableStateFlow(false)
+    val settingsLoaded: StateFlow<Boolean> = _settingsLoaded.asStateFlow()
+
+    init {
+        scope.launch {
+            settingsStore.settings.collect { value ->
+                _settings.value = value
+                _settingsLoaded.value = true
+            }
+        }
+    }
 
     val categories: Flow<List<ExpenseCategory>> = db.expenseCategoryDao().observeAll()
         .map { list -> list.map { ExpenseCategory(it.id, it.name, it.sortOrder) } }
@@ -62,7 +75,7 @@ class WorkRepository(context: Context) {
                 // 旧 JSON 里没有 id 的支出也要有界面标识；迁移后统一补齐。
                 db.expenseDao().fillMissingExternalIds()
                 // 等设置真正读出来再放行界面，避免开屏图/主题先用默认值。
-                settingsStore.settings.first()
+                _settingsLoaded.first { it }
             }.onFailure { error ->
                 _loadError.value = "旧数据迁移失败，下次启动会重试：${error.message ?: error}"
             }
@@ -108,7 +121,11 @@ class WorkRepository(context: Context) {
             SegmentEntity(
                 date = key,
                 startMinute = start,
-                endMinute = if (end <= start) end + 1440 else end,
+                endMinute = when {
+                    segment.endNextDay -> end + 1440
+                    end <= start -> end + 1440
+                    else -> end
+                },
             )
         }
         db.dayRecordDao().save(
@@ -199,9 +216,9 @@ class WorkRepository(context: Context) {
         true
     }.getOrDefault(false)
 
-    suspend fun exportTo(uri: Uri): Boolean {
+    suspend fun exportTo(uri: Uri): Boolean = withContext(Dispatchers.IO) {
         val data = buildBackupFile()
-        return Backup.write(appContext, data, uri)
+        Backup.write(appContext, data, uri)
     }
 
     suspend fun previewImport(uri: Uri): ImportPreview? {
@@ -267,7 +284,8 @@ class WorkRepository(context: Context) {
                 segments = row.segments.sortedBy { it.id }.map {
                     BackupSegment(
                         start = WorkMath.formatMinuteOfDay(it.startMinute),
-                        end = WorkMath.formatMinuteOfDay(it.endMinute),
+                        // 跨夜段按旧格式输出「22:00–02:00」，导入时会再按 end <= start 还原。
+                        end = WorkMath.formatMinuteOfDay(it.endMinute % 1440),
                     )
                 },
                 breakMinutes = row.record.breakMinutes,
@@ -336,9 +354,11 @@ class WorkRepository(context: Context) {
         return date to DayRecord(
             status = statusOf(record.status),
             segments = segments.sortedBy { it.id }.map { segment ->
+                val endNextDay = segment.endMinute >= 1440
                 Segment(
                     start = WorkMath.formatMinuteOfDay(segment.startMinute),
-                    end = WorkMath.formatMinuteOfDay(segment.endMinute),
+                    end = WorkMath.formatMinuteOfDay(segment.endMinute % 1440),
+                    endNextDay = endNextDay,
                 )
             },
             breakMinutes = record.breakMinutes,

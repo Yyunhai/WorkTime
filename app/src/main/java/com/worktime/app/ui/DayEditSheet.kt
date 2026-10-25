@@ -386,14 +386,22 @@ private fun SegmentRow(
             )
         }
         Spacer(Modifier.width(12.dp))
-        ClockField(segment.start) { onChange(segment.copy(start = it)) }
+        ClockField(segment.start) { onChange(segment.withStart(it)) }
         Text(
             text = "–",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 8.dp),
         )
-        ClockField(segment.end) { onChange(segment.copy(end = it)) }
+        ClockField(segment.end) { onChange(segment.withEnd(it)) }
+        if (segment.endNextDay) {
+            Text(
+                text = "次日",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 6.dp),
+            )
+        }
         Spacer(Modifier.weight(1f))
         if (removable) {
             Box(
@@ -414,6 +422,24 @@ private fun SegmentRow(
             Spacer(Modifier.width(32.dp))
         }
     }
+}
+
+private fun Segment.withStart(value: String): Segment {
+    val startMinute = WorkMath.parseClock(value)
+    val endMinute = WorkMath.parseClock(end)
+    return copy(
+        start = value,
+        endNextDay = startMinute != null && endMinute != null && endMinute <= startMinute,
+    )
+}
+
+private fun Segment.withEnd(value: String): Segment {
+    val startMinute = WorkMath.parseClock(start)
+    val endMinute = WorkMath.parseClock(value)
+    return copy(
+        end = value,
+        endNextDay = startMinute != null && endMinute != null && endMinute <= startMinute,
+    )
 }
 
 @Composable

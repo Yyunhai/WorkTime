@@ -38,6 +38,7 @@ class AppViewModel(
     val loaded: StateFlow<Boolean> = repository.loaded
     val loadError: StateFlow<String?> = repository.loadError
     val settings: StateFlow<Settings> = repository.settings
+    val settingsLoaded: StateFlow<Boolean> = repository.settingsLoaded
 
     val categories: StateFlow<List<ExpenseCategory>> = repository.categories
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())

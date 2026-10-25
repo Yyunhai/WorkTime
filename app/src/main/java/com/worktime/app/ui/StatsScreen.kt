@@ -202,7 +202,9 @@ private fun DetailLine(date: LocalDate, record: DayRecord, onClick: () -> Unit) 
             Text(WorkMath.dayLabel(date), style = MaterialTheme.typography.bodyMedium)
             Text(
                 text = if (isWork) {
-                    record.segments.joinToString("  ") { "${it.start}–${it.end}" }
+                    record.segments.joinToString("  ") {
+                        "${it.start}–${it.end}" + if (it.endNextDay) "（次日）" else ""
+                    }
                 } else {
                     statusLabel(record.status)
                 } + if (record.note.isBlank()) "" else " · ${record.note}",

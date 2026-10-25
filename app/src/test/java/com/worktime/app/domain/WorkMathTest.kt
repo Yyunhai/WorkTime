@@ -38,6 +38,17 @@ class WorkMathTest {
     }
 
     @Test
+    fun overnightSegmentWithNextDayFlagIsValid() {
+        val record = DayRecord(
+            status = DayStatus.work,
+            segments = listOf(Segment("22:00", "02:00", endNextDay = true)),
+        )
+        assertEquals(240, WorkMath.segmentMinutes(record.segments.first()))
+        assertEquals(240, WorkMath.netMinutes(record))
+        assertTrue(WorkMath.isRecordValid(record))
+    }
+
+    @Test
     fun nonWorkDaysHaveZeroHours() {
         assertEquals(0, WorkMath.netMinutes(DayRecord(status = DayStatus.rest)))
         assertEquals(0, WorkMath.netMinutes(DayRecord(status = DayStatus.leave)))

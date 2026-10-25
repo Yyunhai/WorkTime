@@ -27,10 +27,11 @@ object WorkMath {
     fun formatMinuteOfDay(minute: Int): String =
         formatClock(minute / 60, minute % 60)
 
-    /** 跨夜（结束不晚于开始）视为非法，返回 null。 */
+    /** 跨夜且未标记次日视为非法；标记次日时按 +24h 计算。 */
     fun segmentMinutes(segment: Segment): Int? {
         val start = parseClock(segment.start) ?: return null
         val end = parseClock(segment.end) ?: return null
+        if (segment.endNextDay) return end + 24 * 60 - start
         return if (end <= start) null else end - start
     }
 
