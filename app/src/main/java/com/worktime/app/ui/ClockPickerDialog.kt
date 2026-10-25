@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -157,10 +156,7 @@ fun ClockPickerDialog(
                         onClick = { onConfirm(WorkMath.formatClock(hour, minute)) },
                         shape = RoundedCornerShape(999.dp),
                         contentPadding = PaddingValues(horizontal = 26.dp, vertical = 12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
-                        ),
+                        colors = primaryButtonColors(),
                         modifier = Modifier.weight(1f),
                     ) {
                         Text("确定", style = MaterialTheme.typography.labelLarge)

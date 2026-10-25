@@ -5,7 +5,6 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import com.worktime.app.data.DayStatus
-import com.worktime.app.data.ExpenseCategory
 import com.worktime.app.data.ThemeMode
 
 /**
@@ -92,6 +91,53 @@ val DarkScheme = darkColorScheme(
     inverseOnSurface = Color(0xFF313033),
 )
 
+/**
+ * 昔涟主题：纯白 + 樱粉/白粉打底，浅紫罗兰只做少量点缀。
+ * 固定浅色，不跟随系统深色。
+ */
+val PinkScheme = lightColorScheme(
+    primary = Color(0xFFB94E78),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFFFE4EE),
+    onPrimaryContainer = Color(0xFF5A1F36),
+
+    secondary = Color(0xFFE58AAE),
+    onSecondary = Color(0xFF5A2338),
+    secondaryContainer = Color(0xFFFFF0F5),
+    onSecondaryContainer = Color(0xFF5A2338),
+
+    tertiary = Color(0xFFC3A6E3),
+    onTertiary = Color(0xFF3A2A4D),
+    tertiaryContainer = Color(0xFFF6F0FC),
+    onTertiaryContainer = Color(0xFF3A2A4D),
+
+    error = Color(0xFFB3261E),
+    onError = Color(0xFFFFFFFF),
+    errorContainer = Color(0xFFF9DEDC),
+    onErrorContainer = Color(0xFF410E0B),
+
+    background = Color(0xFFFFF9FB),
+    onBackground = Color(0xFF3A2830),
+    surface = Color(0xFFFFFFFF),
+    onSurface = Color(0xFF3A2830),
+    surfaceVariant = Color(0xFFFBEAF1),
+    onSurfaceVariant = Color(0xFF6B5560),
+    outline = Color(0xFFA98E9A),
+    outlineVariant = Color(0xFFF2DCE6),
+
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceContainerLow = Color(0xFFFFF4F8),
+    surfaceContainer = Color(0xFFFFEDF3),
+    surfaceContainerHigh = Color(0xFFFCE3EC),
+    surfaceContainerHighest = Color(0xFFF8D7E4),
+
+    inverseSurface = Color(0xFF3A2830),
+    inverseOnSurface = Color(0xFFFFF4F8),
+)
+
+/** 昔涟主题里金额用的柔和玫瑰粉，比主色浅一点，但仍然清晰。 */
+val PinkMoneyInk = Color(0xFFC95F86)
+
 /** 三种日状态用的语义色，独立于 Material 角色，保证浅色深色都能一眼分辨。 */
 data class DayInk(
     val work: Color,
@@ -113,6 +159,13 @@ val LightDayInk = DayInk(
     leave = Color(0xFFB4712A),
 )
 
+/** 昔涟主题下工作状态也跟着偏玫瑰粉，休息/请假保留可区分的青绿与琥珀。 */
+val PinkDayInk = DayInk(
+    work = Color(0xFFB94E78),
+    rest = Color(0xFF3E8E74),
+    leave = Color(0xFFC08A3E),
+)
+
 val DarkDayInk = DayInk(
     work = Color(0xFFC9AEFF),
     rest = Color(0xFF7FD3B2),
@@ -121,33 +174,32 @@ val DarkDayInk = DayInk(
 
 val LocalDayInk = staticCompositionLocalOf { LightDayInk }
 
-/** 支出分类色，同样按浅色/深色各给一套，保证药丸和分类条都看得清。 */
-data class ExpenseInk(private val colors: Map<ExpenseCategory, Color>) {
-    fun of(category: ExpenseCategory): Color =
-        colors[category] ?: colors.getValue(ExpenseCategory.other)
+/** 支出分类色，按分类名取色；自定义分类回落到「其他」。 */
+data class ExpenseInk(private val colors: Map<String, Color>) {
+    fun of(name: String?): Color = colors[name] ?: colors.getValue("其他")
 }
 
 val LightExpenseInk = ExpenseInk(
     mapOf(
-        ExpenseCategory.food to Color(0xFFB0447C),
-        ExpenseCategory.transport to Color(0xFF3F63B5),
-        ExpenseCategory.shopping to Color(0xFFB4712A),
-        ExpenseCategory.home to Color(0xFF2E7D62),
-        ExpenseCategory.entertainment to Color(0xFF7E57A8),
-        ExpenseCategory.health to Color(0xFFB3453E),
-        ExpenseCategory.other to Color(0xFF6F6A75),
+        "餐饮" to Color(0xFFB0447C),
+        "交通" to Color(0xFF3F63B5),
+        "购物" to Color(0xFFB4712A),
+        "居住" to Color(0xFF2E7D62),
+        "娱乐" to Color(0xFF7E57A8),
+        "医疗" to Color(0xFFB3453E),
+        "其他" to Color(0xFF6F6A75),
     ),
 )
 
 val DarkExpenseInk = ExpenseInk(
     mapOf(
-        ExpenseCategory.food to Color(0xFFFFA8CF),
-        ExpenseCategory.transport to Color(0xFFA8C0FF),
-        ExpenseCategory.shopping to Color(0xFFF0B872),
-        ExpenseCategory.home to Color(0xFF7FD3B2),
-        ExpenseCategory.entertainment to Color(0xFFD4B5F0),
-        ExpenseCategory.health to Color(0xFFFFB4AB),
-        ExpenseCategory.other to Color(0xFFCAC4CF),
+        "餐饮" to Color(0xFFFFA8CF),
+        "交通" to Color(0xFFA8C0FF),
+        "购物" to Color(0xFFF0B872),
+        "居住" to Color(0xFF7FD3B2),
+        "娱乐" to Color(0xFFD4B5F0),
+        "医疗" to Color(0xFFFFB4AB),
+        "其他" to Color(0xFFCAC4CF),
     ),
 )
 
@@ -159,18 +211,9 @@ fun statusLabel(status: DayStatus): String = when (status) {
     DayStatus.leave -> "请假"
 }
 
-fun expenseCategoryLabel(category: ExpenseCategory): String = when (category) {
-    ExpenseCategory.food -> "餐饮"
-    ExpenseCategory.transport -> "交通"
-    ExpenseCategory.shopping -> "购物"
-    ExpenseCategory.home -> "居住"
-    ExpenseCategory.entertainment -> "娱乐"
-    ExpenseCategory.health -> "医疗"
-    ExpenseCategory.other -> "其他"
-}
-
 fun themeLabel(mode: ThemeMode): String = when (mode) {
     ThemeMode.system -> "跟随系统"
     ThemeMode.light -> "浅色"
     ThemeMode.dark -> "深色"
+    ThemeMode.pink -> "昔涟"
 }

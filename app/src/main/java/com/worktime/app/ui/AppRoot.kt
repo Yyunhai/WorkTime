@@ -2,6 +2,8 @@ package com.worktime.app.ui
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,7 +29,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,28 +37,38 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.worktime.app.AppViewModel
 import com.worktime.app.R
-import com.worktime.app.data.StoreRepository
+import com.worktime.app.data.ThemeMode
+import com.worktime.app.ui.theme.LocalPinkTheme
+import com.worktime.app.ui.theme.LocalSurfaceAlpha
 import com.worktime.app.ui.theme.NumberFont
 import com.worktime.app.ui.theme.WorkTimeTheme
 import java.time.LocalDate
 import java.time.YearMonth
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
 fun AppRoot(vm: AppViewModel) {
-    val store by vm.store.collectAsState()
-    val loaded by vm.loaded.collectAsState()
-    val loadError by vm.loadError.collectAsState()
-    val pendingImport by vm.pendingImport.collectAsState()
-    val busy by vm.busy.collectAsState()
+    val settings by vm.settings.collectAsStateWithLifecycle()
+    val settingsLoaded by vm.settingsLoaded.collectAsStateWithLifecycle()
+    val loaded by vm.loaded.collectAsStateWithLifecycle()
+    val loadError by vm.loadError.collectAsStateWithLifecycle()
+    val monthData by vm.monthData.collectAsStateWithLifecycle()
+    val categories by vm.categories.collectAsStateWithLifecycle()
+    val pendingImport by vm.pendingImport.collectAsStateWithLifecycle()
+    val busy by vm.busy.collectAsStateWithLifecycle()
 
-    WorkTimeTheme(mode = store.settings.theme) {
-        val today = remember { LocalDate.now() }
+    WorkTimeTheme(mode = settings.theme) {
+        val pink = LocalPinkTheme.current
+        var today by remember { mutableStateOf(LocalDate.now()) }
         var shownMonth by remember { mutableStateOf(YearMonth.from(today)) }
         var editingDate by remember { mutableStateOf<LocalDate?>(null) }
         var showSettings by remember { mutableStateOf(false) }
@@ -65,22 +76,25 @@ fun AppRoot(vm: AppViewModel) {
         val pagerState = rememberPagerState(pageCount = { 3 })
         val scope = rememberCoroutineScope()
 
+        // 应用长时间停留（尤其跨过午夜）后，“今天”也要跟着走。
+        LaunchedEffect(Unit) {
+            while (true) {
+                delay(60_000)
+                val now = LocalDate.now()
+                if (now != today) today = now
+            }
+        }
+
+        LaunchedEffect(shownMonth) {
+            vm.setMonth(shownMonth)
+        }
+
         LaunchedEffect(vm) {
             vm.messages.collect { snackbarHostState.showSnackbar(it) }
         }
 
         LaunchedEffect(loadError) {
-            when (val error = loadError) {
-                is StoreRepository.LoadError.Corrupt -> snackbarHostState.showSnackbar(
-                    "数据文件损坏，已另存为 ${error.archive?.name ?: "备份文件"}，本次以空数据启动",
-                )
-
-                is StoreRepository.LoadError.Failed -> snackbarHostState.showSnackbar(
-                    "读取数据失败，暂时无法保存：${error.cause.message ?: "未知错误"}",
-                )
-
-                null -> Unit
-            }
+            loadError?.let { snackbarHostState.showSnackbar(it) }
         }
 
         val exportLauncher = rememberLauncherForActivityResult(
@@ -92,8 +106,27 @@ fun AppRoot(vm: AppViewModel) {
         ) { uri -> uri?.let { vm.previewImport(it) } }
 
         Box(Modifier.fillMaxSize()) {
+            if (settings.theme == ThemeMode.pink) {
+                Image(
+                    painter = painterResource(R.drawable.pink_art),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFFFFF7FA).copy(alpha = 0.58f)),
+                )
+            }
+
             Scaffold(
                 modifier = Modifier.fillMaxSize(),
+                containerColor = if (settings.theme == ThemeMode.pink) {
+                    Color.Transparent
+                } else {
+                    MaterialTheme.colorScheme.background
+                },
                 topBar = {
                     AppTopBar(
                         month = shownMonth,
@@ -111,8 +144,16 @@ fun AppRoot(vm: AppViewModel) {
                     if (pagerState.currentPage == 0 && loaded) {
                         ExtendedFloatingActionButton(
                             onClick = { editingDate = today },
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                            containerColor = if (pink) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.primary
+                            },
+                            contentColor = if (pink) {
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onPrimary
+                            },
                             icon = { Icon(painterResource(R.drawable.ic_plus), contentDescription = null) },
                             text = { Text("记录今天") },
                         )
@@ -128,30 +169,33 @@ fun AppRoot(vm: AppViewModel) {
                     when (page) {
                         0 -> CalendarScreen(
                             month = shownMonth,
-                            store = store,
+                            records = monthData.records,
+                            summary = monthData.summary,
                             today = today,
                             onDayClick = { if (loaded) editingDate = it },
                         )
 
                         1 -> StatsScreen(
                             month = shownMonth,
-                            store = store,
+                            summary = monthData.summary,
+                            details = monthData.details,
+                            trend = monthData.trend,
+                            maxDailyMinutes = monthData.maxDailyMinutes,
                             onDayClick = { if (loaded) editingDate = it },
                         )
 
                         else -> ExpenseScreen(
                             month = shownMonth,
-                            store = store,
                             today = today,
-                            onAdd = { date, cents, category, note ->
-                                scope.launch { vm.addExpense(date, cents, category, note) }
+                            expenses = monthData.expenses,
+                            totalCents = monthData.expenseTotalCents,
+                            categoryTotals = monthData.categoryTotals,
+                            categories = categories,
+                            onAdd = { date, cents, categoryId, note ->
+                                vm.addExpense(date, cents, categoryId, note)
                             },
-                            onUpdate = { date, expense ->
-                                scope.launch { vm.updateExpense(date, expense) }
-                            },
-                            onDelete = { date, expense ->
-                                scope.launch { vm.deleteExpense(date, expense.id) }
-                            },
+                            onUpdate = { expense -> vm.updateExpense(expense) },
+                            onDelete = { expense -> vm.deleteExpense(expense.id) },
                         )
                     }
                 }
@@ -160,26 +204,19 @@ fun AppRoot(vm: AppViewModel) {
             editingDate?.let { date ->
                 DayEditSheet(
                     date = date,
-                    record = store.records[date.toString()],
-                    expenses = store.expenses[date.toString()].orEmpty(),
-                    onAddExpense = { cents, category, note ->
-                        scope.launch { vm.addExpense(date, cents, category, note) }
+                    record = monthData.records[date.toString()],
+                    expenses = monthData.expenses.filter { it.date == date },
+                    categories = categories,
+                    onAddExpense = { cents, categoryId, note ->
+                        vm.addExpense(date, cents, categoryId, note)
                     },
-                    onUpdateExpense = { expense ->
-                        scope.launch { vm.updateExpense(date, expense) }
-                    },
-                    onDeleteExpense = { expense ->
-                        scope.launch { vm.deleteExpense(date, expense.id) }
-                    },
+                    onUpdateExpense = { expense -> vm.updateExpense(expense) },
+                    onDeleteExpense = { expense -> vm.deleteExpense(expense.id) },
                     onSave = { record ->
-                        scope.launch {
-                            if (vm.saveDay(date, record)) editingDate = null
-                        }
+                        vm.saveDay(date, record) { ok -> if (ok) editingDate = null }
                     },
                     onDelete = {
-                        scope.launch {
-                            if (vm.deleteDay(date)) editingDate = null
-                        }
+                        vm.deleteDay(date) { ok -> if (ok) editingDate = null }
                     },
                     onDismiss = { editingDate = null },
                 )
@@ -187,8 +224,8 @@ fun AppRoot(vm: AppViewModel) {
 
             if (showSettings) {
                 SettingsSheet(
-                    themeMode = store.settings.theme,
-                    launchArtEnabled = store.settings.launchArt,
+                    themeMode = settings.theme,
+                    launchArtEnabled = settings.launchArt,
                     busy = busy,
                     onTheme = vm::setTheme,
                     onLaunchArt = vm::setLaunchArt,
@@ -207,7 +244,7 @@ fun AppRoot(vm: AppViewModel) {
                         Text(
                             "备份中有 ${pending.plan.affectedDays} 天数据：" +
                                 "新增 ${pending.plan.adding} 天，覆盖 ${pending.plan.overwriting} 天。" +
-                                "覆盖会用备份里的记录与支出替换本机同名日期的内容。",
+                                "记录会按日期覆盖，支出按 id 去重后追加。",
                         )
                     },
                     confirmButton = {
@@ -219,7 +256,11 @@ fun AppRoot(vm: AppViewModel) {
                 )
             }
 
-            LaunchArt(loaded = loaded, enabled = store.settings.launchArt)
+            LaunchArt(
+                loaded = loaded && settingsLoaded,
+                enabled = settings.launchArt,
+                theme = settings.theme,
+            )
         }
     }
 }
@@ -238,7 +279,10 @@ private fun AppTopBar(
     onSettings: () -> Unit,
     onSelectPage: (Int) -> Unit,
 ) {
-    Surface(color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxWidth()) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = LocalSurfaceAlpha.current),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
         Column(modifier = Modifier.statusBarsPadding()) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,

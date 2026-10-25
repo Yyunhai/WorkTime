@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import com.worktime.app.R
+import com.worktime.app.data.ThemeMode
 import kotlinx.coroutines.delay
 
 private val SplashArts = intArrayOf(
@@ -27,6 +28,8 @@ private val SplashArts = intArrayOf(
     R.drawable.splash_4,
     R.drawable.splash_5,
 )
+
+private val PinkArt = R.drawable.pink_art
 
 private const val ShowMillis = 700L
 private const val FadeOutMillis = 260L
@@ -38,12 +41,17 @@ private const val FadeOutMillis = 260L
 private var decidedThisProcess = false
 
 @Composable
-fun LaunchArt(loaded: Boolean, enabled: Boolean) {
+fun LaunchArt(loaded: Boolean, enabled: Boolean, theme: ThemeMode) {
     if (!loaded || decidedThisProcess) return
     decidedThisProcess = true
-    if (!enabled) return
 
-    val art = remember { SplashArts.random() }
+    // 昔涟主题固定展示专属图（即使随机开屏的开关是关的）；其它主题沿用随机图。
+    val art = when {
+        theme == ThemeMode.pink -> PinkArt
+        enabled -> SplashArts.random()
+        else -> return
+    }
+
     var active by remember { mutableStateOf(true) }
     if (!active) return
 

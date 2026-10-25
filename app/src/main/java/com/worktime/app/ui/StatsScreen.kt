@@ -28,7 +28,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.worktime.app.data.DayRecord
 import com.worktime.app.data.DayStatus
-import com.worktime.app.data.Store
 import com.worktime.app.domain.WorkMath
 import com.worktime.app.ui.theme.LocalDayInk
 import com.worktime.app.ui.theme.NumberFont
@@ -39,14 +38,16 @@ import java.time.YearMonth
 @Composable
 fun StatsScreen(
     month: YearMonth,
-    store: Store,
+    summary: WorkMath.MonthSummary,
+    details: List<Pair<LocalDate, DayRecord>>,
+    trend: List<Pair<YearMonth, Int>>,
+    maxDailyMinutes: Int,
     onDayClick: (LocalDate) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val window = WorkMath.lastMonths(month, 6)
-    val totals = window.map { WorkMath.monthTotalMinutes(it, store) }
-    val summary = WorkMath.summarize(month, store)
-    val details = WorkMath.recordedDays(month, store).reversed()
+    val window = trend.map { it.first }
+    val totals = trend.map { it.second }
+    val sortedDetails = details.reversed()
 
     Column(
         modifier = modifier
@@ -64,7 +65,7 @@ fun StatsScreen(
                 Metric(text = WorkMath.formatHours(summary.totalMinutes), unit = "小时", label = "本月合计", modifier = Modifier.weight(1f))
                 Metric(text = "${summary.workDays}", unit = "天", label = "出勤", modifier = Modifier.weight(1f))
                 Metric(
-                    text = WorkMath.formatHours(WorkMath.maxDailyMinutes(month, store)),
+                    text = WorkMath.formatHours(maxDailyMinutes),
                     unit = "小时",
                     label = "最高单日",
                     modifier = Modifier.weight(1f),
@@ -75,7 +76,7 @@ fun StatsScreen(
         Spacer(Modifier.height(22.dp))
         SectionLabel("${month.monthValue} 月明细")
         SoftCard {
-            if (details.isEmpty()) {
+            if (sortedDetails.isEmpty()) {
                 Text(
                     text = "这个月还没有记录。",
                     style = MaterialTheme.typography.bodyMedium,
@@ -83,7 +84,7 @@ fun StatsScreen(
                     modifier = Modifier.padding(18.dp),
                 )
             } else {
-                details.forEachIndexed { index, (date, record) ->
+                sortedDetails.forEachIndexed { index, (date, record) ->
                     if (index > 0) {
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(start = 14.dp))
                     }
@@ -201,7 +202,9 @@ private fun DetailLine(date: LocalDate, record: DayRecord, onClick: () -> Unit) 
             Text(WorkMath.dayLabel(date), style = MaterialTheme.typography.bodyMedium)
             Text(
                 text = if (isWork) {
-                    record.segments.joinToString("  ") { "${it.start}–${it.end}" }
+                    record.segments.joinToString("  ") {
+                        "${it.start}–${it.end}" + if (it.endNextDay) "（次日）" else ""
+                    }
                 } else {
                     statusLabel(record.status)
                 } + if (record.note.isBlank()) "" else " · ${record.note}",

@@ -14,7 +14,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         val app = application as WorkTimeApp
         setContent {
-            val vm: AppViewModel = viewModel(factory = AppViewModel.factory(app.repository, app))
+            val vm: AppViewModel = viewModel(factory = AppViewModel.factory(app.repository))
             AppRoot(vm)
         }
     }

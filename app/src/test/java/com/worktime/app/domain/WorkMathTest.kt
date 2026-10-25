@@ -3,7 +3,6 @@ package com.worktime.app.domain
 import com.worktime.app.data.DayRecord
 import com.worktime.app.data.DayStatus
 import com.worktime.app.data.Segment
-import com.worktime.app.data.Store
 import java.time.YearMonth
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -39,6 +38,17 @@ class WorkMathTest {
     }
 
     @Test
+    fun overnightSegmentWithNextDayFlagIsValid() {
+        val record = DayRecord(
+            status = DayStatus.work,
+            segments = listOf(Segment("22:00", "02:00", endNextDay = true)),
+        )
+        assertEquals(240, WorkMath.segmentMinutes(record.segments.first()))
+        assertEquals(240, WorkMath.netMinutes(record))
+        assertTrue(WorkMath.isRecordValid(record))
+    }
+
+    @Test
     fun nonWorkDaysHaveZeroHours() {
         assertEquals(0, WorkMath.netMinutes(DayRecord(status = DayStatus.rest)))
         assertEquals(0, WorkMath.netMinutes(DayRecord(status = DayStatus.leave)))
@@ -60,53 +70,10 @@ class WorkMathTest {
     }
 
     @Test
-    fun summaryCountsWorkDaysAndAverage() {
-        val month = YearMonth.of(2026, 10)
-        val store = Store(
-            records = mapOf(
-                "2026-10-08" to work("09:00" to "18:00", breakMinutes = 60),
-                "2026-10-09" to work("09:00" to "13:00"),
-                "2026-10-10" to DayRecord(status = DayStatus.rest),
-                "2026-10-11" to DayRecord(status = DayStatus.leave),
-            ),
-        )
-        val summary = WorkMath.summarize(month, store)
-        assertEquals(2, summary.workDays)
-        assertEquals(1, summary.restDays)
-        assertEquals(1, summary.leaveDays)
-        assertEquals(480 + 240, summary.totalMinutes)
-        assertEquals(360, summary.averageMinutes)
-        assertEquals(4, summary.recordedDays)
-    }
-
-    @Test
-    fun recordedDaysAreSortedAscending() {
-        val month = YearMonth.of(2026, 10)
-        val store = Store(
-            records = mapOf(
-                "2026-10-20" to DayRecord(status = DayStatus.rest),
-                "2026-10-03" to DayRecord(status = DayStatus.leave),
-                "2026-09-01" to DayRecord(status = DayStatus.rest),
-            ),
-        )
-        val days = WorkMath.recordedDays(month, store)
-        assertEquals(2, days.size)
-        assertEquals("2026-10-03", days.first().first.toString())
-    }
-
-    @Test
-    fun maxDailyMinutesPicksBestDayAndIgnoresOtherMonths() {
-        val month = YearMonth.of(2026, 10)
-        val store = Store(
-            records = mapOf(
-                "2026-10-08" to work("09:00" to "18:00", breakMinutes = 60),
-                "2026-10-09" to work("09:00" to "21:30", breakMinutes = 30),
-                "2026-10-10" to DayRecord(status = DayStatus.rest),
-                "2026-11-01" to work("00:00" to "23:00"),
-            ),
-        )
-        assertEquals(720, WorkMath.maxDailyMinutes(month, store))
-        assertEquals(0, WorkMath.maxDailyMinutes(YearMonth.of(2026, 12), store))
+    fun minuteOfDayFormatting() {
+        assertEquals("00:00", WorkMath.formatMinuteOfDay(0))
+        assertEquals("11:00", WorkMath.formatMinuteOfDay(660))
+        assertEquals("23:59", WorkMath.formatMinuteOfDay(1439))
     }
 
     @Test
@@ -125,37 +92,6 @@ class WorkMathTest {
                 DayRecord(status = DayStatus.rest, segments = listOf(Segment("09:00", "10:00"))),
             ),
         )
-    }
-
-    @Test
-    fun zeroNetWorkDayIsNotAttendance() {
-        val month = YearMonth.of(2026, 10)
-        val store = Store(
-            records = mapOf("2026-10-08" to work("09:00" to "10:00", breakMinutes = 60)),
-        )
-
-        val summary = WorkMath.summarize(month, store)
-
-        assertEquals(0, summary.workDays)
-        assertEquals(0, summary.totalMinutes)
-        assertEquals(0, summary.averageMinutes)
-    }
-
-    @Test
-    fun sanitizeDropsRecordsThatCannotBeCounted() {
-        val store = Store(
-            records = mapOf(
-                "2026-10-08" to work("09:00" to "18:00"),
-                "2026-10-09" to work("22:00" to "02:00"),
-                "2026-10-10" to DayRecord(status = DayStatus.rest),
-                "2026-10-11" to DayRecord(
-                    status = DayStatus.leave,
-                    segments = listOf(Segment("09:00", "10:00")),
-                ),
-            ),
-        )
-
-        assertEquals(setOf("2026-10-08", "2026-10-10"), WorkMath.sanitize(store).records.keys)
     }
 
     @Test

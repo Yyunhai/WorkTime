@@ -52,8 +52,9 @@ import com.worktime.app.domain.ExpenseMath
 import com.worktime.app.domain.WorkMath
 import com.worktime.app.ui.theme.LocalDayInk
 import com.worktime.app.ui.theme.LocalExpenseInk
+import com.worktime.app.ui.theme.LocalPinkTheme
 import com.worktime.app.ui.theme.NumberFont
-import com.worktime.app.ui.theme.expenseCategoryLabel
+import com.worktime.app.ui.theme.PinkMoneyInk
 import com.worktime.app.ui.theme.statusLabel
 import java.time.LocalDate
 
@@ -63,13 +64,15 @@ fun DayEditSheet(
     date: LocalDate,
     record: DayRecord?,
     expenses: List<Expense>,
-    onAddExpense: (amountCents: Long, category: ExpenseCategory, note: String) -> Unit,
+    categories: List<ExpenseCategory>,
+    onAddExpense: (amountCents: Long, categoryId: Long?, note: String) -> Unit,
     onUpdateExpense: (Expense) -> Unit,
     onDeleteExpense: (Expense) -> Unit,
     onSave: (DayRecord) -> Unit,
     onDelete: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val pink = LocalPinkTheme.current
     var status by remember(date) { mutableStateOf(record?.status ?: DayStatus.work) }
     val segments = remember(date) {
         mutableStateListOf<Segment>().apply {
@@ -227,7 +230,7 @@ fun DayEditSheet(
                 Text(
                     text = "当日合计 ¥${ExpenseMath.formatCents(expenses.sumOf { it.amountCents })}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (pink) PinkMoneyInk else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 4.dp),
                 )
             }
@@ -259,6 +262,7 @@ fun DayEditSheet(
                         .weight(1f)
                         .height(50.dp),
                     shape = RoundedCornerShape(16.dp),
+                    colors = primaryButtonColors(),
                 ) {
                     Text(if (record == null) "保存" else "更新")
                 }
@@ -270,8 +274,9 @@ fun DayEditSheet(
         ExpenseEditDialog(
             date = date,
             initial = null,
-            onSave = { cents, category, expenseNote ->
-                onAddExpense(cents, category, expenseNote)
+            categories = categories,
+            onSave = { cents, categoryId, expenseNote ->
+                onAddExpense(cents, categoryId, expenseNote)
                 addingExpense = false
             },
             onDelete = null,
@@ -283,9 +288,10 @@ fun DayEditSheet(
         ExpenseEditDialog(
             date = date,
             initial = expense,
-            onSave = { cents, category, expenseNote ->
+            categories = categories,
+            onSave = { cents, categoryId, expenseNote ->
                 onUpdateExpense(
-                    expense.copy(amountCents = cents, category = category, note = expenseNote),
+                    expense.copy(amountCents = cents, categoryId = categoryId, note = expenseNote),
                 )
                 editingExpense = null
             },
@@ -301,6 +307,7 @@ fun DayEditSheet(
 @Composable
 private fun DayExpenseLine(expense: Expense, onClick: () -> Unit) {
     val ink = LocalExpenseInk.current
+    val pink = LocalPinkTheme.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -312,12 +319,12 @@ private fun DayExpenseLine(expense: Expense, onClick: () -> Unit) {
             modifier = Modifier
                 .size(8.dp)
                 .clip(CircleShape)
-                .background(ink.of(expense.category)),
+                .background(ink.of(expense.categoryName)),
         )
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(
-                text = expenseCategoryLabel(expense.category),
+                text = expense.categoryName ?: "未分类",
                 style = MaterialTheme.typography.bodyMedium,
             )
             if (expense.note.isNotBlank()) {
@@ -333,6 +340,7 @@ private fun DayExpenseLine(expense: Expense, onClick: () -> Unit) {
             text = "¥${ExpenseMath.formatCents(expense.amountCents)}",
             style = MaterialTheme.typography.labelLarge,
             fontFamily = NumberFont,
+            color = if (pink) PinkMoneyInk else MaterialTheme.colorScheme.onSurface,
         )
     }
 }
@@ -384,14 +392,22 @@ private fun SegmentRow(
             )
         }
         Spacer(Modifier.width(12.dp))
-        ClockField(segment.start) { onChange(segment.copy(start = it)) }
+        ClockField(segment.start) { onChange(segment.withStart(it)) }
         Text(
             text = "–",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 8.dp),
         )
-        ClockField(segment.end) { onChange(segment.copy(end = it)) }
+        ClockField(segment.end) { onChange(segment.withEnd(it)) }
+        if (segment.endNextDay) {
+            Text(
+                text = "次日",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 6.dp),
+            )
+        }
         Spacer(Modifier.weight(1f))
         if (removable) {
             Box(
@@ -412,6 +428,24 @@ private fun SegmentRow(
             Spacer(Modifier.width(32.dp))
         }
     }
+}
+
+private fun Segment.withStart(value: String): Segment {
+    val startMinute = WorkMath.parseClock(value)
+    val endMinute = WorkMath.parseClock(end)
+    return copy(
+        start = value,
+        endNextDay = startMinute != null && endMinute != null && endMinute <= startMinute,
+    )
+}
+
+private fun Segment.withEnd(value: String): Segment {
+    val startMinute = WorkMath.parseClock(start)
+    val endMinute = WorkMath.parseClock(value)
+    return copy(
+        end = value,
+        endNextDay = startMinute != null && endMinute != null && endMinute <= startMinute,
+    )
 }
 
 @Composable

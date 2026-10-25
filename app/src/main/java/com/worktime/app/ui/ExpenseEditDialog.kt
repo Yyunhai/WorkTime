@@ -44,8 +44,9 @@ import com.worktime.app.data.ExpenseCategory
 import com.worktime.app.domain.ExpenseMath
 import com.worktime.app.domain.WorkMath
 import com.worktime.app.ui.theme.LocalExpenseInk
+import com.worktime.app.ui.theme.LocalPinkTheme
 import com.worktime.app.ui.theme.NumberFont
-import com.worktime.app.ui.theme.expenseCategoryLabel
+import com.worktime.app.ui.theme.PinkMoneyInk
 import java.time.LocalDate
 
 /** 新增/编辑单笔支出的卡片弹窗。用 Dialog 而不是 BottomSheet，方便叠在日编辑面板之上。 */
@@ -54,19 +55,23 @@ import java.time.LocalDate
 fun ExpenseEditDialog(
     date: LocalDate,
     initial: Expense?,
-    onSave: (amountCents: Long, category: ExpenseCategory, note: String) -> Unit,
+    categories: List<ExpenseCategory>,
+    onSave: (amountCents: Long, categoryId: Long?, note: String) -> Unit,
     onDelete: (() -> Unit)?,
     onDismiss: () -> Unit,
 ) {
     var amountText by remember {
         mutableStateOf(initial?.let { ExpenseMath.formatPlain(it.amountCents) } ?: "")
     }
-    var category by remember { mutableStateOf(initial?.category ?: ExpenseCategory.food) }
+    var categoryId by remember {
+        mutableStateOf(initial?.categoryId ?: categories.firstOrNull()?.id)
+    }
     var note by remember { mutableStateOf(initial?.note ?: "") }
 
     val cents = ExpenseMath.parseAmountToCents(amountText)
     val amountInvalid = amountText.isNotBlank() && cents == null
     val ink = LocalExpenseInk.current
+    val pink = LocalPinkTheme.current
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -112,7 +117,10 @@ fun ExpenseEditDialog(
                         null
                     },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    textStyle = MaterialTheme.typography.headlineSmall.copy(fontFamily = NumberFont),
+                    textStyle = MaterialTheme.typography.headlineSmall.copy(
+                        fontFamily = NumberFont,
+                        color = if (pink) PinkMoneyInk else MaterialTheme.colorScheme.onSurface,
+                    ),
                     modifier = Modifier.fillMaxWidth(),
                 )
 
@@ -127,12 +135,12 @@ fun ExpenseEditDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    ExpenseCategory.entries.forEach { option ->
+                    categories.forEach { option ->
                         Pill(
-                            text = expenseCategoryLabel(option),
-                            selected = option == category,
-                            onClick = { category = option },
-                            accent = ink.of(option),
+                            text = option.name,
+                            selected = option.id == categoryId,
+                            onClick = { categoryId = option.id },
+                            accent = ink.of(option.name),
                         )
                     }
                 }
@@ -169,9 +177,10 @@ fun ExpenseEditDialog(
                     TextButton(onClick = onDismiss) { Text("取消") }
                     Spacer(Modifier.width(8.dp))
                     Button(
-                        onClick = { cents?.let { onSave(it, category, note) } },
+                        onClick = { cents?.let { onSave(it, categoryId, note) } },
                         enabled = cents != null,
                         shape = RoundedCornerShape(999.dp),
+                        colors = primaryButtonColors(),
                     ) {
                         Text(if (initial == null) "记下" else "保存")
                     }

@@ -35,34 +35,36 @@ import androidx.compose.ui.unit.dp
 import com.worktime.app.R
 import com.worktime.app.data.Expense
 import com.worktime.app.data.ExpenseCategory
-import com.worktime.app.data.Store
+import com.worktime.app.domain.CategoryTotal
 import com.worktime.app.domain.ExpenseMath
 import com.worktime.app.ui.theme.LocalExpenseInk
+import com.worktime.app.ui.theme.LocalPinkTheme
 import com.worktime.app.ui.theme.NumberFont
-import com.worktime.app.ui.theme.expenseCategoryLabel
+import com.worktime.app.ui.theme.PinkMoneyInk
 import java.time.LocalDate
 import java.time.YearMonth
 
 @Composable
 fun ExpenseScreen(
     month: YearMonth,
-    store: Store,
     today: LocalDate,
-    onAdd: (LocalDate, Long, ExpenseCategory, String) -> Unit,
-    onUpdate: (LocalDate, Expense) -> Unit,
-    onDelete: (LocalDate, Expense) -> Unit,
+    expenses: List<Expense>,
+    totalCents: Long,
+    categoryTotals: List<CategoryTotal>,
+    categories: List<ExpenseCategory>,
+    onAdd: (LocalDate, Long, Long?, String) -> Unit,
+    onUpdate: (Expense) -> Unit,
+    onDelete: (Expense) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val entries = ExpenseMath.entriesIn(month, store)
-    val total = entries.sumOf { it.second.amountCents }
-    val byCategory = ExpenseMath.byCategory(month, store)
-    val dayCount = entries.map { it.first }.distinct().size
-    val average = if (dayCount == 0) 0L else total / dayCount
+    val dayCount = expenses.map { it.date }.distinct().size
+    val average = if (dayCount == 0) 0L else totalCents / dayCount
     val isCurrentMonth = YearMonth.from(today) == month
     val defaultDate = if (isCurrentMonth) today else month.atDay(1)
+    val pink = LocalPinkTheme.current
 
     var adding by remember { mutableStateOf(false) }
-    var editing by remember { mutableStateOf<Pair<LocalDate, Expense>?>(null) }
+    var editing by remember { mutableStateOf<Expense?>(null) }
 
     Column(
         modifier = modifier
@@ -79,13 +81,17 @@ fun ExpenseScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    text = "¥${ExpenseMath.formatCents(total)}",
+                    text = "¥${ExpenseMath.formatCents(totalCents)}",
                     style = MaterialTheme.typography.displaySmall,
                     fontFamily = NumberFont,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = if (pink) PinkMoneyInk else MaterialTheme.colorScheme.primary,
                 )
             }
-            Button(onClick = { adding = true }, shape = RoundedCornerShape(999.dp)) {
+            Button(
+                onClick = { adding = true },
+                shape = RoundedCornerShape(999.dp),
+                colors = primaryButtonColors(),
+            ) {
                 Icon(
                     painterResource(R.drawable.ic_plus),
                     contentDescription = null,
@@ -96,10 +102,10 @@ fun ExpenseScreen(
             }
         }
         Text(
-            text = if (entries.isEmpty()) {
+            text = if (expenses.isEmpty()) {
                 "这个月还没有支出"
             } else {
-                "共 ${entries.size} 笔 · 日均 ¥${ExpenseMath.formatCents(average)}"
+                "共 ${expenses.size} 笔 · 日均 ¥${ExpenseMath.formatCents(average)}"
             },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -108,16 +114,16 @@ fun ExpenseScreen(
         Spacer(Modifier.height(20.dp))
         SectionLabel("分类")
         SoftCard {
-            if (byCategory.isEmpty()) {
+            if (categoryTotals.isEmpty()) {
                 Text(
                     text = "记下第一笔后，这里会按分类汇总。",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
-                byCategory.forEachIndexed { index, (category, cents) ->
+                categoryTotals.forEachIndexed { index, total ->
                     if (index > 0) Spacer(Modifier.height(12.dp))
-                    CategoryBar(category = category, cents = cents, total = total)
+                    CategoryBar(name = total.name, cents = total.amountCents, total = totalCents)
                 }
             }
         }
@@ -125,8 +131,7 @@ fun ExpenseScreen(
         Spacer(Modifier.height(22.dp))
         SectionLabel("明细")
         SoftCard(contentPadding = 4.dp) {
-            val sorted = entries.sortedByDescending { it.first }
-            if (sorted.isEmpty()) {
+            if (expenses.isEmpty()) {
                 Text(
                     text = "点右上角「记一笔」开始记录。",
                     style = MaterialTheme.typography.bodyMedium,
@@ -134,18 +139,14 @@ fun ExpenseScreen(
                     modifier = Modifier.padding(14.dp),
                 )
             } else {
-                sorted.forEachIndexed { index, (date, expense) ->
+                expenses.forEachIndexed { index, expense ->
                     if (index > 0) {
                         HorizontalDivider(
                             color = MaterialTheme.colorScheme.outlineVariant,
                             modifier = Modifier.padding(start = 14.dp),
                         )
                     }
-                    ExpenseLine(
-                        date = date,
-                        expense = expense,
-                        onClick = { editing = date to expense },
-                    )
+                    ExpenseLine(expense = expense, onClick = { editing = expense })
                 }
             }
         }
@@ -156,8 +157,9 @@ fun ExpenseScreen(
         ExpenseEditDialog(
             date = defaultDate,
             initial = null,
-            onSave = { cents, category, note ->
-                onAdd(defaultDate, cents, category, note)
+            categories = categories,
+            onSave = { cents, categoryId, note ->
+                onAdd(defaultDate, cents, categoryId, note)
                 adding = false
             },
             onDelete = null,
@@ -165,16 +167,19 @@ fun ExpenseScreen(
         )
     }
 
-    editing?.let { (date, expense) ->
+    editing?.let { expense ->
         ExpenseEditDialog(
-            date = date,
+            date = expense.date,
             initial = expense,
-            onSave = { cents, category, note ->
-                onUpdate(date, expense.copy(amountCents = cents, category = category, note = note))
+            categories = categories,
+            onSave = { cents, categoryId, note ->
+                onUpdate(
+                    expense.copy(amountCents = cents, categoryId = categoryId, note = note),
+                )
                 editing = null
             },
             onDelete = {
-                onDelete(date, expense)
+                onDelete(expense)
                 editing = null
             },
             onDismiss = { editing = null },
@@ -183,9 +188,10 @@ fun ExpenseScreen(
 }
 
 @Composable
-private fun CategoryBar(category: ExpenseCategory, cents: Long, total: Long) {
+private fun CategoryBar(name: String, cents: Long, total: Long) {
     val ink = LocalExpenseInk.current
-    val color = ink.of(category)
+    val pink = LocalPinkTheme.current
+    val color = ink.of(name)
     val fraction = if (total <= 0) 0f else (cents.toFloat() / total).coerceIn(0f, 1f)
 
     Column {
@@ -198,7 +204,7 @@ private fun CategoryBar(category: ExpenseCategory, cents: Long, total: Long) {
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                text = expenseCategoryLabel(category),
+                text = name,
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.weight(1f),
             )
@@ -206,7 +212,7 @@ private fun CategoryBar(category: ExpenseCategory, cents: Long, total: Long) {
                 text = "¥${ExpenseMath.formatCents(cents)}",
                 style = MaterialTheme.typography.labelLarge,
                 fontFamily = NumberFont,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = if (pink) PinkMoneyInk else MaterialTheme.colorScheme.onSurface,
             )
         }
         Spacer(Modifier.height(6.dp))
@@ -229,8 +235,10 @@ private fun CategoryBar(category: ExpenseCategory, cents: Long, total: Long) {
 }
 
 @Composable
-private fun ExpenseLine(date: LocalDate, expense: Expense, onClick: () -> Unit) {
+private fun ExpenseLine(expense: Expense, onClick: () -> Unit) {
     val ink = LocalExpenseInk.current
+    val pink = LocalPinkTheme.current
+    val categoryName = expense.categoryName ?: "未分类"
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -242,12 +250,12 @@ private fun ExpenseLine(date: LocalDate, expense: Expense, onClick: () -> Unit) 
             modifier = Modifier
                 .size(8.dp)
                 .clip(CircleShape)
-                .background(ink.of(expense.category)),
+                .background(ink.of(categoryName)),
         )
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(
-                text = "${date.monthValue}月${date.dayOfMonth}日 · ${expenseCategoryLabel(expense.category)}",
+                text = "${expense.date.monthValue}月${expense.date.dayOfMonth}日 · $categoryName",
                 style = MaterialTheme.typography.bodyMedium,
             )
             if (expense.note.isNotBlank()) {
@@ -264,6 +272,7 @@ private fun ExpenseLine(date: LocalDate, expense: Expense, onClick: () -> Unit) 
             text = "¥${ExpenseMath.formatCents(expense.amountCents)}",
             style = MaterialTheme.typography.labelLarge,
             fontFamily = NumberFont,
+            color = if (pink) PinkMoneyInk else MaterialTheme.colorScheme.onSurface,
         )
     }
 }

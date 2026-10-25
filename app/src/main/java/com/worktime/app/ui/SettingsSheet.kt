@@ -73,8 +73,13 @@ fun SettingsSheet(
             SoftCard(contentPadding = 6.dp) {
                 SwitchRow(
                     title = "随机开屏图片",
-                    description = "打开应用时随机显示一张全屏图片，短暂停留后淡出；关闭后直接进入主界面",
+                    description = if (themeMode == ThemeMode.pink) {
+                        "昔涟主题固定显示专属开屏，随机开屏已自动关闭"
+                    } else {
+                        "打开应用时随机显示一张全屏图片，短暂停留后淡出；关闭后直接进入主界面"
+                    },
                     checked = launchArtEnabled,
+                    enabled = themeMode != ThemeMode.pink,
                     onCheckedChange = onLaunchArt,
                 )
             }
@@ -122,7 +127,7 @@ fun SettingsSheet(
 
             Spacer(Modifier.height(20.dp))
             Text(
-                text = "数据保存在应用私有目录的单个文件里，卸载应用或清除数据会一起丢失，" +
+                text = "数据保存在本机的数据库和设置文件里，卸载应用或清除数据会一起丢失，" +
                     "所以重装前请先导出备份。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -157,17 +162,26 @@ private fun SwitchRow(
     title: String,
     description: String,
     checked: Boolean,
+    enabled: Boolean = true,
     onCheckedChange: (Boolean) -> Unit,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onCheckedChange(!checked) }
+            .clickable(enabled = enabled) { onCheckedChange(!checked) }
             .padding(horizontal = 16.dp, vertical = 10.dp),
     ) {
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (enabled) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                },
+            )
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodySmall,
@@ -175,7 +189,7 @@ private fun SwitchRow(
             )
         }
         Spacer(Modifier.width(12.dp))
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
     }
 }
 
