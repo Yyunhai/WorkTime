@@ -4,8 +4,5 @@
         <!-- 不要系统 starting window（Android 12 强制启动画面就是它），冷启动第一帧直接是随机启动图 -->
         <item name="android:windowDisablePreview">true</item>
         <item name="android:windowBackground">@color/app_background</item>
-        <item name="android:windowSplashScreenBackground">@color/app_background</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_art</item>
-        <item name="android:windowSplashScreenIconBackgroundColor">@color/splash_icon_background</item>
     </style>
 </resources>

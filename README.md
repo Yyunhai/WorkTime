@@ -29,7 +29,7 @@
 | 数据访问 | DAO 返回 `Flow`，按日期范围 `BETWEEN` 查询；统计在 SQL 里完成 |
 | 序列化 | kotlinx.serialization（仅备份 JSON，基于 org.json 做旧数据迁移） |
 | 构建 | Gradle 9.5.0（Wrapper）、AGP 9.3.2、版本目录 `libs.versions.toml` |
-| SDK | minSdk 31 / targetSdk 36 / compileSdk 37 |
+| SDK | minSdk 23（Android 6）/ targetSdk 36 / compileSdk 37 |
 | Java | 源码与目标兼容级别 11 |
 
 ## 环境要求

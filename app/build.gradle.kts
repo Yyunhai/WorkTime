@@ -61,7 +61,7 @@ android {
 
     defaultConfig {
         applicationId = "com.worktime.app"
-        minSdk = 31
+        minSdk = 23
         targetSdk = 36
         //versionCode = 1
         //versionName = "1.0"
@@ -82,6 +82,8 @@ android {
         }
     }
     compileOptions {
+        // minSdk 23 上没有 java.time，需要 core library desugaring。
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
@@ -112,6 +114,7 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.datastore.preferences)
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
